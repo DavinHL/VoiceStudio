@@ -21,6 +21,7 @@ export function SaveAudioButton({
   mp3Url,
   suggestedName,
   disabled = false,
+  disabledHint,
   iconOnly = false,
 }: {
   url?: string;
@@ -28,6 +29,11 @@ export function SaveAudioButton({
   mp3Url?: string;
   suggestedName: string;
   disabled?: boolean;
+  /**
+   * Why the control is inert — surfaced as the tooltip so a disabled Save
+   * never looks broken (a row with no converted result yet, for example).
+   */
+  disabledHint?: string;
   /** A compact secondary action: the label becomes the tooltip. */
   iconOnly?: boolean;
 }) {
@@ -66,13 +72,15 @@ export function SaveAudioButton({
   // Only a missing target disables the control: without the desktop bridge the
   // browser's own download is the destination, so the button still works.
   const off = disabled || saving || !url;
+  // A disabled Save must say why; otherwise it reads as a broken button.
+  const label = !url && disabledHint ? disabledHint : t('clone.download');
 
   const button = (
     <Button
       variant="ghost"
       size={iconOnly ? 'icon-sm' : 'sm'}
-      aria-label={iconOnly ? t('clone.download') : undefined}
-      title={iconOnly ? t('clone.download') : undefined}
+      aria-label={iconOnly || label !== t('clone.download') ? label : undefined}
+      title={iconOnly ? label : disabledHint && off ? disabledHint : undefined}
       onClick={() => void save()}
       disabled={off}
     >

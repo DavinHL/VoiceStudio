@@ -572,9 +572,9 @@ export function VoiceChangerPage() {
                       <SaveAudioButton
                         url={item.result ? apiPath(item.result.audio_url) : undefined}
                         suggestedName={`${baseName(item.file.name)}-${chosen?.name ?? 'voice'}.wav`}
+                        disabledHint={t('voiceChanger.save_needs_result')}
                         iconOnly
-                      />
-                      <Button
+                      />                      <Button
                         variant="ghost"
                         size="icon-sm"
                         aria-label={t('voiceChanger.remove')}

@@ -63,8 +63,7 @@ it('stays clickable in a browser tab, where no desktop bridge exists', async () 
   );
 });
 
-it('offers the format menu without a bridge too', async () => {
-  mocks.bridge = null;
+it('offers the format menu without a bridge too', async () => {  mocks.bridge = null;
   render(
     <SaveAudioButton
       url="/audio/ab12cd34.wav"
@@ -79,4 +78,29 @@ it('offers the format menu without a bridge too', async () => {
   await waitFor(() =>
     expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.mp3', 'take.mp3'),
   );
+});
+
+it('explains an inert Save instead of looking broken, and still saves once ready', async () => {
+  const { rerender } = render(
+    <SaveAudioButton suggestedName="take.wav" disabledHint="voiceChanger.save_needs_result" />,
+  );
+  const inert = screen.getByRole('button', { name: 'voiceChanger.save_needs_result' });
+  expect(inert).toBeDisabled();
+  expect(inert).toHaveAttribute('title', 'voiceChanger.save_needs_result');
+
+  rerender(<SaveAudioButton url="/audio/ab12cd34.wav" suggestedName="take.wav" />);
+  const ready = screen.getByRole('button', { name: /clone\.download/ });
+  expect(ready).toBeEnabled();
+  expect(ready).not.toHaveAttribute('title');
+  fireEvent.click(ready);
+  await waitFor(() =>
+    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.wav', 'take.wav'),
+  );
+});
+
+it('shows the plain label for a disabled Save with no hint', () => {
+  render(<SaveAudioButton suggestedName="take.wav" />);
+  const button = screen.getByRole('button', { name: /clone\.download/ });
+  expect(button).toBeDisabled();
+  expect(button).not.toHaveAttribute('title');
 });

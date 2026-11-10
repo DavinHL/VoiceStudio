@@ -4723,6 +4723,7 @@
     "take_discard": "Discard",
     "pick_voice_hint": "Pick the voice everything is converted into.",
     "selected_voice": "Converting into {{name}}",
-    "no_matches": "No voice matches “{{query}}”."
+    "no_matches": "No voice matches “{{query}}”.",
+    "save_needs_result": "Convert this clip first — Save as appears when the result is ready."
   }
 }

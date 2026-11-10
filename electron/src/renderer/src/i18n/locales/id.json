@@ -4723,6 +4723,7 @@
     "take_discard": "Buang",
     "pick_voice_hint": "Pilih suara tujuan untuk semua file yang dikonversi.",
     "selected_voice": "Dikonversi ke {{name}}",
-    "no_matches": "Tidak ada suara yang cocok dengan “{{query}}”."
+    "no_matches": "Tidak ada suara yang cocok dengan “{{query}}”.",
+    "save_needs_result": "Konversi klip ini dulu — tombol Save as muncul setelah hasilnya siap."
   }
 }
