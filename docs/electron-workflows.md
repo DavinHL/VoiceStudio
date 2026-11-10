@@ -23,7 +23,10 @@ every step is set.
 
 The executable steps are the input (**Start** or **Audio**), **Speak**,
 **Convert**, **Transcribe**, **Translate**, **Normalize**, **Condition** and
-**End**. **Agent** and **Call** remain local drafts: they can be placed on the
+**End**. Running a batch outside a workflow — one voice over many uploaded audio or
+video files at once — is the standalone Voice Changer page at `#/voice-changer`,
+described in [the tools workspace](electron-tools.md); it reuses the same Convert
+backend without the canvas. **Agent** and **Call** remain local drafts: they can be placed on the
 canvas, but a workflow containing one does not run. Steps are contract-checked
 before anything executes — text reaches translation or speech, audio reaches
 transcription or conversion, and generated speech reaches normalization — so an

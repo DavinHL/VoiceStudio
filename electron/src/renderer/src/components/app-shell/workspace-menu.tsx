@@ -16,6 +16,7 @@ import {
   ChevronRightIcon,
   BlocksIcon,
   WorkflowIcon,
+  ArrowLeftRightIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -37,6 +38,7 @@ type Destination = readonly [
     | '/transcriptions'
     | '/personas'
     | '/workflows'
+    | '/voice-changer'
     | '/integrations',
   label: string,
   icon: typeof AudioLinesIcon,
@@ -47,6 +49,7 @@ const openSaved = () => setWorkspace({ libraryOpen: true, libraryTab: 'voices' }
 
 const voiceDestinations: Destination[] = [
   ['/clone', 'nav.clone_short', FingerprintIcon, openSaved],
+  ['/voice-changer', 'voiceChanger.title', ArrowLeftRightIcon],
   ['/design', 'designWorkspace.title', WandSparklesIcon],
   ['/personas', 'nav.saved', UsersRoundIcon, openSaved],
   ['/gallery', 'nav.gallery', LibraryIcon],
@@ -85,6 +88,7 @@ const iconMotion: Record<Destination[0], string> = {
   '/workflows': 'pulse',
   '/projects': 'lift',
   '/tools': 'tilt',
+  '/voice-changer': 'pulse',
   '/integrations': 'turn',
 };
 

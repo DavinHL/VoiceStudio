@@ -866,3 +866,107 @@ def test_keep_delivery_refuses_an_overlong_source(client, monkeypatch, profile):
     assert r.status_code == 422
     assert "longer than" in r.json()["detail"]
     assert vc_cls.vc_calls == []
+
+
+# ── Video sources (the Voice Changer workspace accepts audio AND video) ──────
+
+def _video_upload(client, pid, name="clip.mp4", **extra):
+    return client.post(
+        "/convert",
+        data={"profile_id": pid, "match_duration": "0", **extra},
+        files={"audio": (name, b"\x00\x00\x00\x18ftypmp42-fake-bytes", "video/mp4")},
+    )
+
+
+def _stub_video_extract(monkeypatch, calls):
+    """Fake the ffmpeg seams the video path uses, recording the argv."""
+    import services.ffmpeg_utils as ff
+
+    monkeypatch.setattr(ff, "find_ffmpeg", lambda: "ffmpeg")
+    monkeypatch.setattr(ff, "require_audio_stream", lambda path: None)
+
+    async def spawn(cmd, **kwargs):
+        calls.append(list(cmd))
+
+        class _Proc:
+            returncode = 0
+            stderr = b""
+
+        # The real ffmpeg writes the extracted audio file the caller reads next.
+        out = cmd[-1]
+        with open(out, "wb") as fh:
+            fh.write(b"RIFF-fake-extracted-wav")
+
+        return _Proc()
+
+    monkeypatch.setattr(ff, "spawn_subprocess", spawn)
+
+
+def test_video_source_is_decoded_to_its_audio_track(client, monkeypatch, clone_profile):
+    """A .mp4 upload must reach Convert as extracted mono audio, not as the
+    container: ffmpeg runs with -vn and the pinned first audio stream, and the
+    engine is conditioned exactly as for an audio upload."""
+    fake = _make_fake_engine(f"fake-vid-{uuid.uuid4().hex[:6]}")
+    asr = _FakeASR({"text": "hello from a video", "segments": [
+        {"start": 0.0, "end": 1.5, "text": "hello from a video"},
+    ]})
+    _wire_stubs(monkeypatch, engine_cls=fake, asr=asr)
+    calls: list = []
+    _stub_video_extract(monkeypatch, calls)
+
+    res = _video_upload(client, clone_profile)
+    assert res.status_code == 200, res.text
+
+    # One extraction, carrying the flags that make it an AUDIO extraction.
+    assert len(calls) == 1
+    argv = calls[0]
+    assert "-vn" in argv
+    assert "-map" in argv and argv[argv.index("-map") + 1] == "0:a:0"
+    assert argv[-1].endswith(".audio.wav")
+    assert "24000" in argv
+
+    # ASR and TTS ran on the extracted track, never on the video container.
+    assert asr.calls, "the extracted audio must be what gets transcribed"
+    assert "/audio/" in res.json()["audio_url"]
+
+
+def test_video_without_an_audio_stream_is_a_typed_415(client, monkeypatch, clone_profile):
+    """A silent video answers the typed no-audio answer instead of an empty
+    transcript. No engine work starts."""
+    from core.failure import NoAudioTrackError
+
+    import services.ffmpeg_utils as ff
+
+    fake = _make_fake_engine(f"fake-silent-{uuid.uuid4().hex[:6]}")
+    _wire_stubs(monkeypatch, engine_cls=fake, asr=_FakeASR({"text": "x", "segments": []}))
+
+    def no_audio(path):
+        raise NoAudioTrackError()
+
+    monkeypatch.setattr(ff, "require_audio_stream", no_audio)
+
+    res = _video_upload(client, clone_profile)
+    assert res.status_code in (415, 422)
+    detail = res.json()["detail"]
+    assert "audio" in str(detail).lower()
+    assert not fake.calls, "no synthesis may run for a clip with no sound"
+
+
+def test_audio_uploads_never_run_the_video_extractor(client, monkeypatch, clone_profile):
+    """The extraction step is video-only: a plain .wav upload must not spawn
+    ffmpeg at all."""
+    fake = _make_fake_engine(f"fake-wav-{uuid.uuid4().hex[:6]}")
+    asr = _FakeASR({"text": "plain audio", "segments": [
+        {"start": 0.0, "end": 1.0, "text": "plain audio"},
+    ]})
+    _wire_stubs(monkeypatch, engine_cls=fake, asr=asr)
+
+    import services.ffmpeg_utils as ff
+
+    def boom(*args, **kwargs):
+        raise AssertionError("an audio upload must not be decoded by ffmpeg")
+
+    monkeypatch.setattr(ff, "spawn_subprocess", boom)
+
+    res = _post_convert(client, clone_profile, match_duration="0")
+    assert res.status_code == 200, res.text

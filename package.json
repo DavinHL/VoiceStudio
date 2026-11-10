@@ -9,6 +9,8 @@
     "clean:all": "node scripts/clean-all.mjs",
     "setup:api": "node scripts/setup-api.mjs",
     "dev:api": "bun scripts/dev-backend.mjs",
+    "dev:api:noreload": "bun scripts/dev-backend.mjs --no-watch",
+    "dev:noreload": "bun run setup:api && concurrently -n api,fe -c green,cyan --kill-others-on-fail \"bun run dev:api:noreload\" \"bun run dev:frontend\"",
     "dev:frontend": "bun run --cwd electron dev:web",
     "dev:desktop": "bun run --cwd electron dev",
     "wait:api": "node scripts/wait-app-port.mjs api",

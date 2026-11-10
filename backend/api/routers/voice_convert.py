@@ -46,6 +46,7 @@ import time
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from api.dependencies import consumer_generation, require_consumer_reads_admin_writes
 from core.path_security import upload_suffix
+from core.logging_utils import log_safe
 
 router = APIRouter(dependencies=[Depends(require_consumer_reads_admin_writes)])
 logger = logging.getLogger("omnivoice.convert")
@@ -60,6 +61,80 @@ ATEMPO_MAX = 2.0
 #: Within this relative tolerance the durations already match — stretching
 #: would resample the whole take for an inaudible gain.
 _MATCH_TOLERANCE = 0.02
+
+#: Container suffixes whose audio track is extracted before conversion. The
+#: Voice Changer workspace accepts video clips, so a recording picked from the
+#: camera roll works exactly like an audio file: ffmpeg keeps the audio stream
+#: and the rest of Convert never has to know the source was a video.
+_VIDEO_SUFFIXES = frozenset(
+    {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".flv", ".wmv", ".mpeg", ".mpg", ".3gp"}
+)
+
+
+#: A video's audio track is decoded at this rate. It matches the rate
+#: ``services.voice_conversion`` decodes at, so neither Convert mode resamples
+#: the extracted track twice.
+_VIDEO_EXTRACT_SR = 24_000
+#: Extraction is a local transcode of an already size-capped upload; a minute is
+#: far past any real clip and still bounds a wedged ffmpeg.
+_VIDEO_EXTRACT_TIMEOUT_S = 60.0
+
+
+async def _audio_track_path(source_path: str, suffix: str) -> str:
+    """The audio file Convert should read.
+
+    Audio uploads pass through untouched. A video container is decoded to a mono
+    24 kHz WAV beside the upload, so a clip picked from the camera roll works
+    exactly like an audio file and the rest of Convert never has to know the
+    source was a video.
+
+    A manifest named like a video (its payload is an HLS/DASH playlist ffmpeg
+    would happily follow to the network) and a container with no audio stream
+    are both refused here with the same typed failures ``require_audio_stream``
+    raises for audio uploads, so the caller's existing handlers answer them.
+    """
+    if suffix.lower() not in _VIDEO_SUFFIXES:
+        return source_path
+
+    from services.ffmpeg_utils import (
+        find_ffmpeg,
+        local_inputs_only,
+        raise_for_audio_extract_failure,
+        require_audio_stream,
+        spawn_subprocess,
+    )
+
+    # Raises NoAudioTrackError / InvalidMediaFileError — both ValueError
+    # subclasses the route already maps to a typed answer.
+    await asyncio.to_thread(require_audio_stream, source_path)
+
+    out_path = f"{source_path}.audio.wav"
+    # ``-vn`` drops the video stream; ``-map 0:a:0`` pins the FIRST audio stream
+    # so a multi-track container cannot make ffmpeg pick a commentary track.
+    cmd = local_inputs_only(
+        [
+            find_ffmpeg(), "-y", "-i", source_path,
+            "-vn", "-map", "0:a:0",
+            "-acodec", "pcm_s16le", "-ar", str(_VIDEO_EXTRACT_SR), "-ac", "1",
+            out_path,
+        ]
+    )
+    try:
+        await spawn_subprocess(
+            cmd, timeout=_VIDEO_EXTRACT_TIMEOUT_S,
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+        )
+    except Exception as e:  # noqa: BLE001 — re-raised as the typed media failure
+        stderr = getattr(e, "stderr", b"") or b""
+        logger.warning(
+            "video audio extraction failed: %s", log_safe(stderr.decode("utf-8", "replace")[:400] or e)
+        )
+        raise_for_audio_extract_failure(stderr, source_path)
+        raise HTTPException(
+            status_code=415,
+            detail="Could not read the audio track from that video. Try an MP4 or an audio file.",
+        ) from e
+    return out_path
 
 #: Convert clips are short conversational inputs, not long-form media. Stream
 #: them to disk in bounded chunks so a network-share client cannot make the
@@ -390,15 +465,19 @@ async def convert_speech(
     ext = upload_suffix(audio.filename, ".wav") or ".wav"
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
     source_lease = None
+    extracted_path: str | None = None
     try:
         try:
             await _copy_source_upload(audio, tmp)
         finally:
             tmp.close()
         source_lease = _TempReferenceLease(tmp.name)
+        source_path = await _audio_track_path(tmp.name, ext)
+        if source_path != tmp.name:
+            extracted_path = source_path
 
         if keep_delivery:
-            return await _convert_keeping_delivery(row, profile_id, tmp.name)
+            return await _convert_keeping_delivery(row, profile_id, source_path)
 
         # ── Engine gate before ASR/TTS work: the shared resolver refuses a
         # clone-less engine with the actionable switch-engine message (→ 400),
@@ -419,7 +498,7 @@ async def convert_speech(
         # silently switching to the profile's language.
         source_language = cond["language"] if _is_auto(language) else language
         result = await _transcribe_source(
-            tmp.name, source_lease=source_lease, language=source_language,
+            source_path, source_lease=source_lease, language=source_language,
         )
 
         segments = result.get("segments", [])
@@ -480,7 +559,7 @@ async def convert_speech(
         if match_duration:
             from services.ffmpeg_utils import probe_duration
             source_duration_s = await probe_duration(
-                tmp.name, allowed_root=os.path.dirname(tmp.name),
+                source_path, allowed_root=os.path.dirname(source_path),
             )
             if not source_duration_s and segments:
                 source_duration_s = max((s.get("end", 0) or 0) for s in segments) or None
@@ -592,5 +671,10 @@ async def convert_speech(
         else:
             try:
                 os.unlink(tmp.name)
+            except OSError:
+                pass
+        if extracted_path:
+            try:
+                os.unlink(extracted_path)
             except OSError:
                 pass

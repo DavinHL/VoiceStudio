@@ -40,6 +40,10 @@ const CallsPage = lazyRouteComponent(
   'WorkflowCallsPage',
 );
 const ToolsPage = lazyRouteComponent(() => import('@/features/tools/tools-page'), 'ToolsPage');
+const VoiceChangerPage = lazyRouteComponent(
+  () => import('@/features/voice-changer/voice-changer-page'),
+  'VoiceChangerPage',
+);
 const IntegrationsPage = lazyRouteComponent(
   () => import('@/features/integrations/integrations-page'),
   'IntegrationsPage',
@@ -162,6 +166,11 @@ export const toolsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/tools',
   component: ToolsPage,
+});
+export const voiceChangerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/voice-changer',
+  component: VoiceChangerPage,
 });
 export const integrationsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -298,6 +307,7 @@ export const routeTree = rootRoute.addChildren([
   pronunciationRoute,
   mediaRoute,
   toolsRoute,
+  voiceChangerRoute,
   callsRoute,
   workflowsRoute,
   integrationsRoute,

@@ -88,6 +88,23 @@ export function isBackendSourceChange(filename) {
   return typeof filename === "string" && filename.toLowerCase().endsWith(".py");
 }
 
+/**
+ * Whether `dev:api` should own Python source reloads.
+ *
+ * On Windows `fs.watch` buffers directory events while the backend is busy
+ * importing PyTorch, then replays them *after* startup — so a tree that has not
+ * been edited since yesterday still triggers reloads, and every reload drops
+ * port 3900 for the ~40s the model takes to reload (the UI shows 502 Bad
+ * Gateway for the duration). `OMNIVOICE_DEV_WATCH=0` or `--no-watch` turns the
+ * watcher off; `bun run dev:noreload` does it for you.
+ */
+export function shouldWatchBackendSources(env = process.env, argv = process.argv) {
+  if (argv.includes("--no-watch")) return false;
+  const raw = String(env.OMNIVOICE_DEV_WATCH ?? "").trim().toLowerCase();
+  if (!raw) return true;
+  return raw !== "0" && raw !== "false" && raw !== "no" && raw !== "off";
+}
+
 /** Mirror backend/core/config.py::get_app_data_dir() so the banner reads the
  *  same omnivoice.log the backend writes. Pure — testable with fake inputs. */
 export function resolveDataDir(env = process.env, platform = process.platform, home = homedir()) {
@@ -175,6 +192,7 @@ export function createBackendSupervisor({
   let reloadRequested = false;
   let forcedReloadKill = false;
   let watcher = null;
+  let watcherNoticeShown = false;
   let crashTimes = [];
   let requestedExitCode = null;
 
@@ -230,7 +248,7 @@ export function createBackendSupervisor({
   function start() {
     if (interrupted) return;
 
-    if (!watcher) {
+    if (!watcher && shouldWatchBackendSources()) {
       try {
         watcher = watchBackend(requestReload);
       } catch (err) {
@@ -243,6 +261,15 @@ export function createBackendSupervisor({
         report(`[dev-backend] backend source watcher failed: ${err.message}`);
         stop("SIGTERM", 1);
       });
+    }
+
+    if (!shouldWatchBackendSources() && !watcherNoticeShown) {
+      watcherNoticeShown = true;
+      report(
+        "[dev-backend] source watching is off (--no-watch / OMNIVOICE_DEV_WATCH=0); " +
+          "restart this command after editing backend/*.py — the UI will not reload " +
+          "and will not drop to 502 Bad Gateway on its own.",
+      );
     }
 
     let current;

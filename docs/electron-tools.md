@@ -56,6 +56,35 @@ with a saved sample. Clips longer than about 28 seconds are converted in pieces
 split at pauses; sources over 10 minutes are refused. Voices without a recording
 (designs with no saved sample) are hidden while it is on. The default (off) keeps the transcribe-and-re-speak behaviour.
 
+## Voice Changer
+
+Voice Changer lives at `#/voice-changer` and re-voices whole batches instead of a
+single take. Drop audio or video files onto the queue — video keeps being decoded
+to its first audio track, so `mp4`, `mov`, `mkv`, `webm`, `avi`, `m4v`, `flv`,
+`wmv`, `mpeg`, `mpg` and `3gp` sources are converted without a separate extraction
+step. Audio-only uploads never run the extractor. Each queue row shows its own
+status and its own result player, so finished takes are saved or discarded
+individually; Save all writes every finished take and skips the ones whose save
+dialog is cancelled instead of stopping the rest.
+
+Clips can also be captured in place: **Record a clip** uses the shared recorder
+(microphone picker, channel mode and an input-level meter) and drops the finished
+take into the same queue, where it is converted exactly like a dropped file. The
+recorder is the same hook the Clone and Convert pages use, so its cleanup and
+error handling are identical.
+
+The target voice list matches Tools > Convert: clones and Voice Design profiles
+with reference audio or a locked take. A ready TTS engine with cloning support is
+required to start. Convert runs the queue one file at a time and Stop ends the run
+after the clip in flight; a take that the user aborts returns to the queue instead
+of being reported as a failure, and the settings stay locked until the run stops.
+
+**Keep my delivery** behaves as it does in Tools > Convert and needs an engine
+that converts speech to speech; when no engine advertises
+`supports_voice_conversion`, the control stays unavailable and the page falls back
+to transcribe-and-re-speak. Match duration and source language belong to that
+default path only.
+
 Media-tool installation retries temporary filesystem locks for up to four seconds,
 including Windows locks after the executable probe. It preserves the existing installation in a sibling backup
 until publication succeeds and attempts to restore it if publication fails. If
