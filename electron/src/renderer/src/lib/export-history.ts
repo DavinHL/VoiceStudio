@@ -1,4 +1,5 @@
-import { apiJson } from '@/lib/api/client';
+import { apiJson, errorFromResponse } from '@/lib/api/client';
+import { saveLocalFile } from '@/lib/local-export';
 import { saveBackendFile } from '@/lib/native-save';
 import { queryClient } from '@/lib/query';
 
@@ -17,9 +18,14 @@ function exportMode(filename: string): 'audio' | 'video' | 'file' {
  * native save into the backend's shared export history. History recording is
  * deliberately non-fatal: a bookkeeping outage must not turn a written file
  * into a failed export.
+ *
+ * In a plain browser tab there is no main process to write through, so the
+ * backend URL is fetched and handed to the browser's own download — the same
+ * fallback `saveLocalFile` uses. Without it every export control would be dead
+ * in the web build (#3923).
  */
 export async function saveExport(url: string, suggestedName: string) {
-  const saved = await saveBackendFile({ url, suggestedName });
+  const saved = (await saveBackendFile({ url, suggestedName })) ?? (await saveBrowserDownload(url, suggestedName));
   if (!saved) return null;
   if (!saved.canceled && saved.path) {
     try {
@@ -38,4 +44,15 @@ export async function saveExport(url: string, suggestedName: string) {
     }
   }
   return saved;
+}
+
+/**
+ * Browser-tab fallback: fetch the backend URL and save the bytes locally. The
+ * browser owns the destination, so there is no path to record in history.
+ */
+async function saveBrowserDownload(url: string, suggestedName: string) {
+  const res = await fetch(url, { credentials: 'include' });
+  if (!res.ok) throw await errorFromResponse(res);
+  const saved = await saveLocalFile(await res.blob(), suggestedName);
+  return { canceled: saved.canceled, path: '' };
 }

@@ -11,6 +11,10 @@ import { cn } from '@/lib/utils';
 /**
  * Saves a backend audio file through the native save dialog. One click saves
  * `url` (WAV); with `mp3Url`, a format menu beside it also offers MP3.
+ *
+ * Outside Electron (the web build) there is no dialog to open, so the backend
+ * file is downloaded through the browser instead — the control stays usable
+ * rather than rendering permanently disabled.
  */
 export function SaveAudioButton({
   url,
@@ -33,7 +37,7 @@ export function SaveAudioButton({
   const bridge = getBridge();
 
   const save = async (target = url, name = suggestedName) => {
-    if (!target || !bridge) return;
+    if (!target) return;
     setSaving(true);
     try {
       const saved = await saveExport(target, name);
@@ -44,7 +48,7 @@ export function SaveAudioButton({
           action: {
             label: t('clone.reveal'),
             onClick: () =>
-              void bridge.files.revealPath(path).catch((error) => {
+              void bridge?.files.revealPath(path).catch((error) => {
                 const message = error instanceof Error ? error.message : String(error);
                 toast.error(t('clone.download_failed', { message }));
               }),
@@ -59,7 +63,10 @@ export function SaveAudioButton({
     }
   };
 
-  const off = disabled || saving || !url || !bridge;
+  // Only a missing target disables the control: without the desktop bridge the
+  // browser's own download is the destination, so the button still works.
+  const off = disabled || saving || !url;
+
   const button = (
     <Button
       variant="ghost"

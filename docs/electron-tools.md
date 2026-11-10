@@ -45,7 +45,9 @@ the source and synthesizes its text in the selected voice. Match duration adjust
 the overall length; it does not preserve the original performance's pitch, pauses,
 or expression. The result has the same Download action as Clone and Design takes:
 in the desktop app it opens the native save dialog for the WAV file and records the
-file in export history. The result is also saved to History.
+file in export history; in a plain browser tab, where no main process exists, the
+backend file is downloaded through the browser instead, so the action stays usable
+either way. The result is also saved to History.
 
 **Keep my delivery** (#3421) converts the recording itself instead: only the voice
 changes, and the source's timing, pauses, rhythm and intonation stay as recorded.
