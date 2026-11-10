@@ -4718,6 +4718,13 @@
     "settings_locked": "Voice, language and pacing are locked while the queue runs. Stop the run to change them.",
     "saved_all": "Saved {{count}} take(s)",
     "record": "Record a clip",
-    "record_hint": "A take is queued and converted like any dropped file."
+    "record_hint": "A take is queued and converted like any dropped file.",
+    "take_title": "Review your recording",
+    "take_add": "Add to queue",
+    "take_redo": "Record again",
+    "take_discard": "Discard",
+    "pick_voice_hint": "Pick the voice everything is converted into.",
+    "selected_voice": "Converting into {{name}}",
+    "no_matches": "No voice matches “{{query}}”."
   }
 }

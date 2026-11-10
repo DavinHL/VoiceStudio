@@ -19,6 +19,21 @@ const mock = vi.hoisted(() => ({
     { id: 'a', name: 'Alpha', kind: 'clone', ref_audio_path: 'a.wav' },
     { id: 'b', name: 'Bravo', kind: 'clone', ref_audio_path: 'b.wav' },
   ] as { id: string; name: string; kind: string; ref_audio_path: string | null }[],
+  // The recorder is stubbed: `voice-changer-page` only wires its lifecycle, and
+  // jsdom has no MediaRecorder to drive the real hook with.
+  recStart: vi.fn(),
+  recStop: vi.fn(),
+  rec: {
+    isRecording: false,
+    isStarting: false,
+    isCleaning: false,
+    seconds: 0,
+    inputs: [],
+    selectedInputId: '',
+    channelMode: 'auto' as const,
+    level: 0,
+  },
+  onRecorded: null as null | ((file: File) => void),
 }));
 
 vi.mock('@/hooks/use-engines', () => ({
@@ -55,6 +70,20 @@ vi.mock('@/features/clone/language-picker', () => ({
   LanguagePicker: () => <div data-testid="language-picker" />,
 }));
 vi.mock('@/features/tools/convert-languages', () => ({ CONVERT_SOURCE_LANGUAGES: [] }));
+vi.mock('@/components/audio-preview-button', () => ({
+  AudioPreviewButton: ({ src, source }: { src: string; source: string }) => (
+    <button data-testid="preview" data-src={src} data-source={source} />
+  ),
+}));
+vi.mock('@/hooks/use-recording', () => ({
+  useRecording: (onRecorded: (file: File) => void) => {
+    mock.onRecorded = onRecorded;
+    return { ...mock.rec, start: mock.recStart, stop: mock.recStop };
+  },
+}));
+vi.mock('@/components/recording-inputs', () => ({
+  RecordingInputs: () => <div data-testid="recording-inputs" />,
+}));
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -94,13 +123,41 @@ afterEach(() => {
   cleanup();
   mock.convert.mockReset();
   mock.saveExport.mockClear();
+  mock.recStart.mockClear();
+  mock.recStop.mockClear();
+  mock.onRecorded = null;
   mock.ready = true;
   mock.cloning = true;
   mock.backends = [];
+  mock.rec = {
+    isRecording: false,
+    isStarting: false,
+    isCleaning: false,
+    seconds: 0,
+    inputs: [],
+    selectedInputId: '',
+    channelMode: 'auto',
+    level: 0,
+  };
   mock.profiles = [
     { id: 'a', name: 'Alpha', kind: 'clone', ref_audio_path: 'a.wav' },
     { id: 'b', name: 'Bravo', kind: 'clone', ref_audio_path: 'b.wav' },
   ];
+});
+
+/** Drives the stubbed recorder through a completed take. */
+function recordTake(name = 'take.wav') {
+  const take = new File([new Uint8Array(4096)], name, { type: 'audio/wav' });
+  mock.onRecorded?.(take);
+  return take;
+}
+
+beforeEach(() => {
+  // jsdom has no object-URL store; the review panel only needs a stable string.
+  vi.stubGlobal('URL', {
+    createObjectURL: () => 'blob:take',
+    revokeObjectURL: () => {},
+  });
 });
 
 it('converts every queued clip into the selected voice, one after another', async () => {
@@ -214,4 +271,85 @@ it('offers Keep my delivery only when an engine converts speech to speech', () =
     'aria-disabled',
     'true',
   );
+});
+
+it('keeps the stop control clickable while a recording is running', async () => {
+  renderPage();
+  fireEvent.click(screen.getByRole('button', { name: /voiceChanger.record/ }));
+
+  // The recorder is live: the button must flip to Stop and stay enabled, or the
+  // user can never end the take from the page.
+  mock.rec = { ...mock.rec, isRecording: true };
+  renderPage();
+  const stop = screen.getByRole('button', { name: /clone.stop_recording/ });
+  expect(stop).not.toBeDisabled();
+
+  fireEvent.click(stop);
+  await waitFor(() => expect(mock.recStop).toHaveBeenCalled());
+});
+
+it('reviews a finished take instead of queueing it straight away', async () => {
+  mock.convert.mockImplementation(async (file: File) => result(file.name));
+  renderPage();
+  addClips(['one.wav']);
+  recordTake('take.wav');
+
+  // The take is held for review: it is shown, but not yet part of the queue.
+  await screen.findByLabelText('voiceChanger.take_title');
+  expect(screen.getByText('voiceChanger.take_add')).toBeTruthy();
+  await waitFor(() => expect(screen.getAllByTestId('waveform')).toHaveLength(1));
+
+  fireEvent.click(screen.getByRole('button', { name: /voiceChanger.take_add/ }));
+  // Adding the take clears the review panel; the queue itself is unchanged
+  // until a conversion produces a result.
+  await waitFor(() => expect(screen.queryByLabelText('voiceChanger.take_title')).toBeNull());
+
+  fireEvent.click(screen.getByRole('button', { name: /voiceChanger.convert_all/ }));
+  await waitFor(() => expect(mock.convert).toHaveBeenCalledTimes(2));
+  expect(mock.convert.mock.calls.map((call) => call[0].name)).toEqual(['one.wav', 'take.wav']);
+  await waitFor(() => expect(screen.getAllByTestId('waveform')).toHaveLength(2));
+});
+
+it('discards a take without converting it', async () => {
+  mock.convert.mockImplementation(async (file: File) => result(file.name));
+  renderPage();
+  recordTake('take.wav');
+  await screen.findByLabelText('voiceChanger.take_title');
+
+  fireEvent.click(screen.getByRole('button', { name: /voiceChanger.take_discard/ }));
+  await waitFor(() => expect(screen.queryByLabelText('voiceChanger.take_title')).toBeNull());
+  expect(screen.queryByTestId('waveform')).toBeNull();
+  expect(screen.getByRole('button', { name: /voiceChanger.convert_all/ })).toBeDisabled();
+});
+
+it('shows where the next conversion goes and previews each voice', async () => {
+  renderPage();
+  const alpha = screen.getByRole('button', { name: /Alpha/ });
+  expect(alpha).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByText('voiceChanger.selected_voice')).toBeTruthy();
+
+  // Each row can be auditioned before it is chosen.
+  const previews = screen.getAllByTestId('preview');
+  expect(previews.map((node) => node.getAttribute('data-source'))).toEqual([
+    'voice-changer-voice-a',
+    'voice-changer-voice-b',
+  ]);
+
+  fireEvent.click(screen.getByRole('button', { name: /Bravo/ }));
+  expect(screen.getByRole('button', { name: /Bravo/ })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: /Alpha/ })).toHaveAttribute('aria-pressed', 'false');
+});
+
+it('filters the voice list and says so when nothing matches', async () => {
+  renderPage();
+  expect(screen.getByRole('button', { name: /Alpha/ })).toBeTruthy();
+
+  const search = screen.getByLabelText('voiceChanger.pick_voice');
+  fireEvent.change(search, { target: { value: 'brav' } });
+
+  await waitFor(() => expect(screen.queryByRole('button', { name: /Alpha/ })).toBeNull());
+  expect(screen.getByRole('button', { name: /Bravo/ })).toBeTruthy();
+
+  fireEvent.change(search, { target: { value: 'zzz' } });
+  await waitFor(() => expect(screen.getByText('voiceChanger.no_matches')).toBeTruthy());
 });

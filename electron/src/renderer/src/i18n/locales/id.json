@@ -4716,6 +4716,13 @@
     "settings_locked": "Suara, bahasa, dan tempo terkunci selama antrean berjalan. Hentikan dulu untuk mengubahnya.",
     "saved_all": "{{count}} hasil tersimpan",
     "record": "Rekam klip",
-    "record_hint": "Hasil rekaman masuk ke antrean dan dikonversi seperti file lain."
+    "record_hint": "Hasil rekaman masuk ke antrean dan dikonversi seperti file lain.",
+    "take_title": "Tinjau hasil rekaman",
+    "take_add": "Tambahkan ke antrean",
+    "take_redo": "Rekam ulang",
+    "take_discard": "Buang",
+    "pick_voice_hint": "Pilih suara tujuan untuk semua file yang dikonversi.",
+    "selected_voice": "Dikonversi ke {{name}}",
+    "no_matches": "Tidak ada suara yang cocok dengan “{{query}}”."
   }
 }

@@ -3,6 +3,7 @@ import {
   ArrowLeftRightIcon,
   BanIcon,
   CheckCircle2Icon,
+  CheckIcon,
   DownloadIcon,
   InfoIcon,
   Loader2Icon,
@@ -12,13 +13,14 @@ import {
   UploadIcon,
   WandSparklesIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
 
 import { SecondarySidebar } from '@/components/workspace-sidebar';
 import { WorkspaceHeader } from '@/components/app-shell/workspace-header';
 import { ProfileAvatar } from '@/components/profile-avatar';
+import { AudioPreviewButton } from '@/components/audio-preview-button';
 import { PipelineFailure } from '@/components/pipeline-failure';
 import { RecordingInputs } from '@/components/recording-inputs';
 import { WaveformPlayer } from '@/components/waveform-player';
@@ -31,7 +33,7 @@ import { CONVERT_SOURCE_LANGUAGES } from '@/features/tools/convert-languages';
 import { useEngines } from '@/hooks/use-engines';
 import { useProfiles } from '@/hooks/use-profiles';
 import { useRecording } from '@/hooks/use-recording';
-import { apiPath, describeError } from '@/lib/api/client';
+import { apiPath, describeError, profileAudioUrl } from '@/lib/api/client';
 import { convertSpeech, type ConvertResult } from '@/lib/api/convert';
 import { saveExport } from '@/lib/export-history';
 import { toast } from 'sonner';
@@ -100,6 +102,11 @@ export function VoiceChangerPage() {
   );
   const chosen = voices.find((p) => p.id === voice);
   const ready = keepDelivery ? canKeepDelivery : canClone;
+  const filteredVoices = useMemo(() => {
+    const needle = search.trim().toLocaleLowerCase();
+    if (!needle) return voices;
+    return voices.filter((p) => p.name.toLocaleLowerCase().includes(needle));
+  }, [voices, search]);
 
   // Keep the selection valid: preselect the first voice, and drop a selection
   // that no longer exists (the profile was deleted or lost its reference while
@@ -131,10 +138,29 @@ export function VoiceChangerPage() {
     ]);
   }, []);
 
-  // A microphone take joins the queue like any other clip, so it converts in
-  // the same pass and lands in the same Save-all batch.
-  const recording = useRecording((file) => addFiles([file]), false);
+  // A finished take is held here first so it can be reviewed before it joins
+  // the queue: recording is the one source the user cannot re-import from disk,
+  // so converting it straight away hides both the mistake and the undo.
+  const [take, setTake] = useState<File | null>(null);
+  const [takeUrl, setTakeUrl] = useState('');
+  const recording = useRecording((file) => setTake(file), false);
+  // Any part of the take lifecycle blocks actions that would fight with it —
+  // but NOT the record button itself, which has to stay clickable to stop.
   const recordingBusy = recording.isStarting || recording.isRecording || recording.isCleaning;
+
+  useEffect(() => {
+    const url = take ? URL.createObjectURL(take) : '';
+    setTakeUrl(url);
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [take]);
+
+  const acceptTake = () => {
+    if (!take) return;
+    addFiles([take]);
+    setTake(null);
+  };
 
   const patch = (id: string, next: Partial<QueueItem>) =>
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...next } : item)));
@@ -227,6 +253,11 @@ export function VoiceChangerPage() {
             <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {t('voiceChanger.target_voice')}
             </h2>
+            <p className="text-xs text-muted-foreground">
+              {chosen
+                ? t('voiceChanger.selected_voice', { name: chosen.name })
+                : t('voiceChanger.pick_voice_hint')}
+            </p>
             <Input
               aria-label={t('voiceChanger.pick_voice')}
               placeholder={t('voiceChanger.pick_voice')}
@@ -234,20 +265,36 @@ export function VoiceChangerPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
             <div className="max-h-64 space-y-1 overflow-y-auto">
-              {voices
-                .filter((p) => p.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
-                .map((p) => (
+              {filteredVoices.map((p) => (
+                <div
+                  key={p.id}
+                  className={`flex items-center gap-1 rounded-md px-1 py-0.5 ${
+                    voice === p.id ? 'bg-secondary' : ''
+                  }`}
+                >
                   <Button
-                    key={p.id}
-                    variant={voice === p.id ? 'secondary' : 'ghost'}
-                    className="w-full justify-start"
+                    variant="ghost"
+                    className="min-w-0 flex-1 justify-start"
                     aria-pressed={voice === p.id}
                     onClick={() => setVoice(p.id)}
                   >
                     <ProfileAvatar name={p.name} imageUrl={p.image_url} className="size-6" />
                     <span className="truncate">{p.name}</span>
+                    {voice === p.id && <CheckIcon className="ms-auto size-3.5 shrink-0" />}
                   </Button>
-                ))}
+                  {/* Hearing the voice is what makes the choice obvious; the
+                      clip is the profile's own reference take. */}
+                  <AudioPreviewButton
+                    src={profileAudioUrl(p.id, p.audio_url)}
+                    source={`voice-changer-voice-${p.id}`}
+                  />
+                </div>
+              ))}
+              {voices.length > 0 && !filteredVoices.length && (
+                <p className="px-1 py-2 text-sm text-muted-foreground">
+                  {t('voiceChanger.no_matches', { query: search })}
+                </p>
+              )}
               {!voices.length && (
                 <p className="text-sm text-muted-foreground">
                   {t('voiceChanger.no_voices')}{' '}
@@ -345,6 +392,7 @@ export function VoiceChangerPage() {
               className={`h-auto min-h-28 w-full whitespace-normal border-dashed p-6 ${
                 dragOver ? 'border-primary bg-primary/5' : ''
               }`}
+              disabled={recordingBusy}
               onClick={() => input.current?.click()}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -368,16 +416,19 @@ export function VoiceChangerPage() {
 
             <div className="flex flex-wrap items-center gap-2">
               <Button
-                variant="outline"
+                variant={recording.isRecording ? 'destructive' : 'outline'}
                 aria-pressed={recording.isRecording}
-                disabled={busy || recordingBusy}
+                // Stop must stay clickable while recording, so this excludes
+                // `recordingBusy` — that flag is true *during* the take and
+                // disabling on it is what made Stop a dead button.
+                disabled={busy || recording.isStarting}
                 onClick={() => {
                   if (recording.isRecording) recording.stop();
                   else void recording.start();
                 }}
               >
                 {recording.isRecording ? (
-                  <SquareIcon className="text-destructive" />
+                  <SquareIcon className="fill-current" />
                 ) : (
                   <MicIcon />
                 )}
@@ -414,12 +465,47 @@ export function VoiceChangerPage() {
             </div>
             <RecordingInputs rec={recording} disabled={busy || recording.isCleaning} />
 
+            {take && (
+              <section
+                className="space-y-2 rounded-lg border border-border bg-card/40 p-3"
+                aria-label={t('voiceChanger.take_title')}
+              >
+                <p className="text-sm font-medium">{t('voiceChanger.take_title')}</p>
+                {takeUrl && (
+                  <WaveformPlayer src={takeUrl} source="voice-changer-take" height={36} />
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="default" disabled={busy} onClick={acceptTake}>
+                    <CheckCircle2Icon />
+                    {t('voiceChanger.take_add')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={busy || recording.isStarting}
+                    onClick={() => {
+                      // Drop the old take before recording again: leaving it in
+                      // place would show a stale waveform next to a live meter.
+                      setTake(null);
+                      void recording.start();
+                    }}
+                  >
+                    <MicIcon />
+                    {t('voiceChanger.take_redo')}
+                  </Button>
+                  <Button variant="ghost" disabled={busy} onClick={() => setTake(null)}>
+                    <Trash2Icon />
+                    {t('voiceChanger.take_discard')}
+                  </Button>
+                </div>
+              </section>
+            )}
+
             {error && <PipelineFailure fallback={error} onDismiss={() => setError('')} />}
 
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="default"
-                disabled={!ready || busy || !chosen || !pendingCount}
+                disabled={!ready || busy || recordingBusy || !chosen || !pendingCount}
                 onClick={() => void run()}
               >
                 {busy ? <Loader2Icon className="animate-spin" /> : <WandSparklesIcon />}

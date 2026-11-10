@@ -68,16 +68,20 @@ individually; Save all writes every finished take and skips the ones whose save
 dialog is cancelled instead of stopping the rest.
 
 Clips can also be captured in place: **Record a clip** uses the shared recorder
-(microphone picker, channel mode and an input-level meter) and drops the finished
-take into the same queue, where it is converted exactly like a dropped file. The
-recorder is the same hook the Clone and Convert pages use, so its cleanup and
-error handling are identical.
+(microphone picker, channel mode and an input-level meter). Stop stays clickable
+for the whole take, and the finished recording is reviewed in its own panel with a
+waveform and **Add to queue** / **Record again** / **Discard** before anything is
+queued, so a bad take is never converted by accident. The recorder is the same hook
+the Clone and Convert pages use, so its cleanup and error handling are identical.
 
 The target voice list matches Tools > Convert: clones and Voice Design profiles
 with reference audio or a locked take. A ready TTS engine with cloning support is
-required to start. Convert runs the queue one file at a time and Stop ends the run
-after the clip in flight; a take that the user aborts returns to the queue instead
-of being reported as a failure, and the settings stay locked until the run stops.
+required to start. The pane states which voice the queue converts into, marks the
+selected row, and offers a preview button beside each voice so the choice can be
+auditioned before a run; filtering by name reports when nothing matches. Convert
+runs the queue one file at a time and Stop ends the run after the clip in flight; a
+take that the user aborts returns to the queue instead of being reported as a
+failure, and the settings stay locked until the run stops.
 
 **Keep my delivery** behaves as it does in Tools > Convert and needs an engine
 that converts speech to speech; when no engine advertises
