@@ -7,11 +7,35 @@ import { discoverPythonRuntimes, type PythonDiscoveryFileSystem } from './python
 const cleanups: string[] = [];
 afterEach(async () => { await Promise.all(cleanups.splice(0).map(p => rm(p, { recursive: true, force: true }))); });
 async function fixture() { const root = await mkdtemp(join(tmpdir(), 'python-discovery-')); cleanups.push(root); return root; }
+// Discovery defaults to the host platform, so real-venv fixtures must use the
+// host's layout; fakes below pin their own platform explicitly.
+const WIN = process.platform === 'win32';
+const BIN = WIN ? 'Scripts' : 'bin';
+const PYTHON = WIN ? 'python.exe' : 'python';
+const PYTHON3 = WIN ? 'python3.exe' : 'python3';
+const PATH_SEP = WIN ? ';' : ':';
+const pythonIn = (env: string) => join(env, BIN, PYTHON);
+const python3In = (env: string) => join(env, BIN, PYTHON3);
+// Windows only grants file-symlink creation with Developer Mode or elevation.
+const supportsFileSymlinks = await (async () => {
+  const probe = await mkdtemp(join(tmpdir(), 'python-discovery-probe-'));
+  try {
+    await writeFile(join(probe, 'a'), 'x'); await symlink(join(probe, 'a'), join(probe, 'b')); return true;
+  } catch { return false; } finally { await rm(probe, { recursive: true, force: true }); }
+})();
 async function makeVenv(root: string, name: string, version = '3.12.1') {
-  const env = join(root, name); await mkdir(join(env, 'bin'), { recursive: true });
-  await writeFile(join(env, 'bin', 'python'), 'not executed');
+  const env = join(root, name); await mkdir(join(env, BIN), { recursive: true });
+  await writeFile(pythonIn(env), 'not executed');
   await writeFile(join(env, 'pyvenv.cfg'), `home = /base\nversion = ${version}\n`); return env;
 }
+// Directory symlinks use a Windows junction so the cycle test needs no
+// Developer Mode; the probe reports the rare host that still refuses one.
+const supportsDirectorySymlinks = await (async () => {
+  const probe = await mkdtemp(join(tmpdir(), 'python-discovery-probe-'));
+  try {
+    await mkdir(join(probe, 'target')); await symlink(join(probe, 'target'), join(probe, 'link'), 'junction'); return true;
+  } catch { return false; } finally { await rm(probe, { recursive: true, force: true }); }
+})();
 const fakeFs = (overrides: Partial<PythonDiscoveryFileSystem> = {}): PythonDiscoveryFileSystem => ({
   readdir: async () => [], stat: async () => ({ isFile: () => false, isDirectory: () => true }),
   lstat: async () => ({ isSymbolicLink: () => false, isDirectory: () => true }), realpath: async p => p,
@@ -21,40 +45,43 @@ describe('discoverPythonRuntimes', () => {
   test('finds project venv metadata without executing the interpreter', async () => {
     const root = await fixture(), env = await makeVenv(root, 'project/.venv');
     const result = await discoverPythonRuntimes({ roots: [root], homeDir: root, env: { PATH: '' } });
-    expect(result.candidates).toContainEqual({ pythonPath: join(env, 'bin', 'python'), source: 'venv', version: '3.12.1' });
-    expect(await readFile(join(env,'bin','python'),'utf8')).toBe('not executed');
+    expect(result.candidates).toContainEqual({ pythonPath: pythonIn(env), source: 'venv', version: '3.12.1' });
+    expect(await readFile(pythonIn(env),'utf8')).toBe('not executed');
   });
-  test('deduplicates command aliases', async () => {
+  test.skipIf(!supportsFileSymlinks)('deduplicates command aliases', async () => {
     const root = await fixture(), bin = join(root,'bin'); await mkdir(bin);
-    await writeFile(join(bin,'python'),'not executed'); await symlink(join(bin,'python'),join(bin,'python3'));
+    await writeFile(join(bin,PYTHON),'not executed'); await symlink(join(bin,PYTHON),join(bin,PYTHON3));
     const result = await discoverPythonRuntimes({roots:[],homeDir:root,env:{PATH:bin}});
     expect(result.candidates).toHaveLength(1);
   });
-  test('preserves separate PATH virtualenvs sharing one base Python and deduplicates each environment', async () => {
+  test.skipIf(!supportsFileSymlinks)('preserves separate PATH virtualenvs sharing one base Python and deduplicates each environment', async () => {
     const root = await fixture(), a = await makeVenv(root,'a/.venv'), b = await makeVenv(root,'b/.venv');
     const base=join(root,'base');await writeFile(base,'not executed');
-    for(const env of [a,b]) {await rm(join(env,'bin','python'));await symlink(base,join(env,'bin','python'));await symlink(base,join(env,'bin','python3'));}
-    const result=await discoverPythonRuntimes({roots:[root],homeDir:root,env:{PATH:[join(a,'bin'),join(b,'bin')].join(':')}});
-    expect(result.candidates.map(x=>x.pythonPath)).toEqual([join(a,'bin','python'),join(b,'bin','python')]);
+    for(const env of [a,b]) {await rm(pythonIn(env));await symlink(base,pythonIn(env));await symlink(base,python3In(env));}
+    const result=await discoverPythonRuntimes({roots:[root],homeDir:root,env:{PATH:[join(a,BIN),join(b,BIN)].join(PATH_SEP)}});
+    expect(result.candidates.map(x=>x.pythonPath)).toEqual([pythonIn(a),pythonIn(b)]);
   });
   test('reports EACCES and EPERM as partial, preserving readable results', async () => {
-    const root=await fixture();await makeVenv(root,'project/.venv');
+    const root=await fixture(), denied=await mkdtemp(join(tmpdir(), 'python-denied-'));cleanups.push(denied);
+    await makeVenv(root,'project/.venv');
     for(const code of ['EACCES','EPERM']) {
-      const result=await discoverPythonRuntimes({roots:[root,'/denied'],homeDir:root,env:{PATH:''},fs:{lstat:async p=>{if(p==='/denied')throw Object.assign(new Error('denied'),{code});return (await import('node:fs/promises')).lstat(p);}}});
+      const result=await discoverPythonRuntimes({roots:[root,denied],homeDir:root,env:{PATH:''},fs:{lstat:async p=>{if(p===denied)throw Object.assign(new Error('denied'),{code});return (await import('node:fs/promises')).lstat(p);}}});
       expect(result.candidates.length).toBeGreaterThan(0);expect(result.partial).toBe(true);
-      expect(result.warnings).toContainEqual({path:'/denied',reason:'permission_denied'});
+      expect(result.warnings).toContainEqual({path:denied,reason:'permission_denied'});
     }
   });
   test('does not label absent common locations as errors',async()=>{
     const root=await fixture();const result=await discoverPythonRuntimes({roots:[join(root,'absent')],homeDir:root,env:{PATH:''}});
     expect(result).toMatchObject({candidates:[],warnings:[],partial:false});
   });
+  // The fake filesystems below are keyed on POSIX paths, so they pin the
+  // platform explicitly instead of inheriting the host's path rules.
   test('reports an actual directory budget cutoff',async()=>{
-    const result=await discoverPythonRuntimes({roots:['/fixture'],homeDir:'/fixture',env:{PATH:''},maxDirs:1,fs:fakeFs({readdir:async p=>p==='/fixture'?['child']:[]})});
+    const result=await discoverPythonRuntimes({platform:'linux',roots:['/fixture'],homeDir:'/fixture',env:{PATH:''},maxDirs:1,fs:fakeFs({readdir:async p=>p==='/fixture'?['child']:[]})});
     expect(result.partial).toBe(true);expect(result.warnings.some(w=>w.reason==='scan_limit')).toBe(true);
   });
   test('reports other filesystem failures as incomplete rather than silently empty',async()=>{
-    const result=await discoverPythonRuntimes({roots:['/bad'],env:{PATH:''},fs:fakeFs({lstat:async()=>{throw Object.assign(new Error('io'),{code:'EIO'});}})});
+    const result=await discoverPythonRuntimes({platform:'linux',roots:['/bad'],env:{PATH:''},fs:fakeFs({lstat:async()=>{throw Object.assign(new Error('io'),{code:'EIO'});}})});
     expect(result.partial).toBe(true);expect(result.warnings).toContainEqual({path:'/bad',reason:'read_error'});
   });
   test('supports Windows Scripts paths on a non-Windows test host',async()=>{
@@ -85,19 +112,19 @@ describe('discoverPythonRuntimes', () => {
     expect(result.candidates.map(c=>c.pythonPath)).toEqual([...exes]);
   });
   test('returns partial on a slow operation even if it is the final configured directory',async()=>{
-    const result=await discoverPythonRuntimes({roots:['/slow'],homeDir:'/fixture',env:{PATH:''},timeoutMs:15,fs:fakeFs({readdir:async()=>new Promise<string[]>(()=>{})})});
+    const result=await discoverPythonRuntimes({platform:'linux',roots:['/slow'],homeDir:'/fixture',env:{PATH:''},timeoutMs:15,fs:fakeFs({readdir:async()=>new Promise<string[]>(()=>{})})});
     expect(result.partial).toBe(true);expect(result.warnings.some(w=>w.reason==='scan_limit')).toBe(true);
   });
-  test('never follows directory symlink cycles or descends node_modules',async()=>{
+  test.skipIf(!supportsDirectorySymlinks)('never follows directory symlink cycles or descends node_modules',async()=>{
     const root=await fixture();await makeVenv(root,'project/.venv');await mkdir(join(root,'node_modules','ignored'),{recursive:true});
-    await symlink(root,join(root,'project','loop'));
+    await symlink(root,join(root,'project','loop'),'junction');
     const result=await discoverPythonRuntimes({roots:[root],homeDir:root,env:{PATH:''},maxDepth:2});
     expect(result.candidates).toHaveLength(1);expect(result.partial).toBe(false);
   });
   test('discovers arbitrary pyenv release names without version hardcoding',async()=>{
     const home=await fixture(),root=join(home,'.pyenv','versions'),env=await makeVenv(root,'3.14.7');
     const result=await discoverPythonRuntimes({roots:[root],homeDir:home,env:{PATH:''}});
-    expect(result.candidates).toContainEqual({pythonPath:join(env,'bin','python'),source:'pyenv',version:'3.12.1'});
+    expect(result.candidates).toContainEqual({pythonPath:pythonIn(env),source:'pyenv',version:'3.12.1'});
   });
   test('has no subprocess execution dependency',async()=>{
     const source=await readFile(resolve(__dirname,'python-runtime-discovery.ts'),'utf8');

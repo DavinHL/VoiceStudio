@@ -9,6 +9,11 @@ import { SELECTED_RUNTIME_IMPORT_PROBE, STARTUP_IMPORT_PROBE, buildPythonRepairP
 const userData = mkdtempSync(join(tmpdir(), 'voicestudio-runtime-test-'));
 vi.mock('electron', () => ({ app: { getPath: () => userData } }));
 
+// Resolve once so the expected value matches the platform's absolute form on
+// Windows too (a POSIX-style `/tmp/...` string resolves to a drive-qualified path).
+const FIXTURE_INTERPRETER = resolve('/tmp/fixture/.venv/bin/python');
+const REQUIREMENTS_PROJECT = resolve('/tmp/requirements/project');
+
 import { needsManagedRuntime, validatePythonRuntime, clearPythonRuntimeSelection, loadPythonRuntimeSelection, savePythonRuntimeSelection } from './runtime-python-selection';
 
 describe('existing Python runtime selection', () => {
@@ -16,8 +21,8 @@ describe('existing Python runtime selection', () => {
   afterEach(() => clearPythonRuntimeSelection());
 
   it('persists and reloads an absolute interpreter path', () => {
-    savePythonRuntimeSelection('/tmp/fixture/.venv/bin/python');
-    expect(loadPythonRuntimeSelection()).toEqual({ pythonPath: '/tmp/fixture/.venv/bin/python' });
+    savePythonRuntimeSelection(FIXTURE_INTERPRETER);
+    expect(loadPythonRuntimeSelection()).toEqual({ pythonPath: FIXTURE_INTERPRETER });
   });
 
   it('rejects a missing interpreter without spawning it', async () => {
@@ -107,11 +112,11 @@ describe('existing Python runtime selection', () => {
   it('builds repair plans only from reviewed project requirements', () => {
     const project = mkdtempSync(join(tmpdir(), 'voicestudio-manifest-'));
     writeFileSync(join(project, 'pyproject.toml'), '[project]\ndependencies = [\n  "torch>=2.4",\n  "torchaudio>=2.4",\n  "setuptools>=75,<80",\n]\n');
-    expect(buildPythonRepairPlan('/tmp/requirements/project', ['torch'], project)).toEqual({
-      interpreter: '/tmp/requirements/project', packages: ['torch>=2.4'],
+    expect(buildPythonRepairPlan(REQUIREMENTS_PROJECT, ['torch'], project)).toEqual({
+      interpreter: REQUIREMENTS_PROJECT, packages: ['torch>=2.4'],
     });
-    expect(buildPythonRepairPlan('/tmp/requirements/project', ['torch', 'NoSuchModule'], project)).toBeNull();
-    expect(buildPythonRepairPlan('/tmp/requirements/project', ['torchaudio'], project)?.packages).toEqual(['torchaudio>=2.4']);
+    expect(buildPythonRepairPlan(REQUIREMENTS_PROJECT, ['torch', 'NoSuchModule'], project)).toBeNull();
+    expect(buildPythonRepairPlan(REQUIREMENTS_PROJECT, ['torchaudio'], project)?.packages).toEqual(['torchaudio>=2.4']);
   });
 
   it('does not inherit Python or pip installation overrides', () => {
