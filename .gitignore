@@ -188,3 +188,10 @@ backend/assets/samples/demo/dubbing/*.src.wav
 # handoff (canonical in vssaas) and Microsoft Store listing text drafts.
 /account_login/
 /store-*-en.txt
+
+# Local dev run state, model cache and uv cache created by the sandboxed Windows
+# dev session (`bun run dev:web` with OMNIVOICE_DATA_DIR/OMNIVOICE_CACHE_DIR/
+# UV_CACHE_DIR pointed into the checkout). Never commit user data or weights.
+/.devdata/
+/.devcache/
+/.devhf/
