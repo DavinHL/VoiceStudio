@@ -191,8 +191,25 @@ def trim_trailing_silence(
 
 
 
+#: Silence kept before the first voiced sample. A take has to open on its
+#: sound, but cutting flush against the onset clips the first consonant's
+#: attack, so a couple of milliseconds of context stay.
+HEAD_MARGIN_MS = 2
+
+#: Silence kept after the last voiced sample. Generous on purpose: a release
+#: (a final fricative or a breath) decays below the silence floor before it is
+#: actually over, so a tight tail would chop the end of a word.
+TAIL_MARGIN_MS = 50
+
+
 def trim_speech_padding(audio_tensor: torch.Tensor, sample_rate: int) -> torch.Tensor:
-    """Remove generated edge silence before timing, retaining 50 ms of context.
+    """Remove generated edge silence before timing, retaining a short context.
+
+    The head keeps only :data:`HEAD_MARGIN_MS` of context. Engines pad their
+    output with a block of true digital silence, and a full 50 ms of it read as
+    a clipped-off opening: every take jumped from -60 dBFS to full level in one
+    step, so the first word landed hard and sounded unclear (#3926). The tail
+    keeps :data:`TAIL_MARGIN_MS`, because a word's release decays before it ends.
 
     Never compress silence into the spoken slot or delete internal pauses.
     Silent/invalid outputs remain intact for the generation integrity guard.
@@ -205,9 +222,10 @@ def trim_speech_padding(audio_tensor: torch.Tensor, sample_rate: int) -> torch.T
     voiced = torch.nonzero(envelope > 10 ** (-50 / 20))
     if voiced.numel() == 0:
         return audio_tensor
-    margin = int(sample_rate * 0.05)
-    start = max(0, int(voiced[0].item()) - margin)
-    end = min(audio_tensor.shape[-1], int(voiced[-1].item()) + 1 + margin)
+    head = int(sample_rate * HEAD_MARGIN_MS / 1000)
+    tail = int(sample_rate * TAIL_MARGIN_MS / 1000)
+    start = max(0, int(voiced[0].item()) - head)
+    end = min(audio_tensor.shape[-1], int(voiced[-1].item()) + 1 + tail)
     return audio_tensor[..., start:end]
 
 #: Samples per block for the numpy stages. Long takes are processed in blocks

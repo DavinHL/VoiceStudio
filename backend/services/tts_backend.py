@@ -2037,7 +2037,12 @@ _VOXCPM_REF_MAX_S = 30.0
 
 #: Silence pad kept around the voiced region when trimming a reference clip —
 #: a hard cut exactly at the first/last voiced sample clips consonant onsets.
-_VOXCPM_REF_EDGE_PAD_S = 0.05
+#: The head keeps only a hair of it, though: a reference clip that opens on
+#: 50 ms of digital silence teaches the model to reproduce that blank, which is
+#: what made cloned takes open on a clipped-off first word (#3926). The tail
+#: stays generous, because a release decays before it is actually over.
+_VOXCPM_REF_HEAD_PAD_S = 0.002
+_VOXCPM_REF_TAIL_PAD_S = 0.05
 
 
 def _version_tuple(v: str) -> Optional[tuple[int, ...]]:
@@ -2122,8 +2127,9 @@ def _prepare_voxcpm_ref(path: str) -> str:
     minimal, conservative preparation the model expects:
 
       • trim leading/trailing near-silence (amplitude threshold at the same
-        -50 dBFS floor `audio_dsp.normalize_audio` uses, with a small
-        :data:`_VOXCPM_REF_EDGE_PAD_S` pad kept on each side), and
+        -50 dBFS floor `audio_dsp.normalize_audio` uses, keeping
+        :data:`_VOXCPM_REF_HEAD_PAD_S` before the first voiced sample and
+        :data:`_VOXCPM_REF_TAIL_PAD_S` after the last), and
       • cap the reference at :data:`_VOXCPM_REF_MAX_S` seconds from the
         trimmed start.
 
@@ -2159,9 +2165,10 @@ def _prepare_voxcpm_ref(path: str) -> str:
             _VOXCPM_REF_PREP_CACHE[cache_key] = abspath
             return path
 
-        pad = int(_VOXCPM_REF_EDGE_PAD_S * sr)
-        start = max(0, int(voiced[0]) - pad)
-        end = min(n, int(voiced[-1]) + 1 + pad)
+        head_pad = int(_VOXCPM_REF_HEAD_PAD_S * sr)
+        tail_pad = int(_VOXCPM_REF_TAIL_PAD_S * sr)
+        start = max(0, int(voiced[0]) - head_pad)
+        end = min(n, int(voiced[-1]) + 1 + tail_pad)
         cap = int(_VOXCPM_REF_MAX_S * sr)
         capped = end > start + cap
         end = min(end, start + cap)

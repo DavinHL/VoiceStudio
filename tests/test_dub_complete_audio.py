@@ -134,12 +134,14 @@ def test_failed_regeneration_preserves_previous_track(render_dub):
 
 
 def test_timing_trims_edge_silence_but_keeps_internal_pauses():
-    from services.audio_dsp import trim_speech_padding
+    from services.audio_dsp import HEAD_MARGIN_MS, TAIL_MARGIN_MS, trim_speech_padding
     wav = torch.cat((torch.zeros(1, 1000), torch.ones(1, 200)*.1,
                      torch.zeros(1, 200), torch.ones(1, 200)*.1, torch.zeros(1,1000)), dim=-1)
     result = trim_speech_padding(wav, 1000)
-    assert result.shape[-1] == 700
-    assert torch.equal(result[..., 250:450], torch.zeros(1,200))
+    # Speech runs from 1000 ms to 1400 ms; the head keeps only a hair of
+    # context (#3926) while the tail keeps its full release margin.
+    assert result.shape[-1] == 200 + 200 + 200 + HEAD_MARGIN_MS + TAIL_MARGIN_MS
+    assert torch.equal(result[..., HEAD_MARGIN_MS + 200:HEAD_MARGIN_MS + 400], torch.zeros(1,200))
 
 
 def _replace_subtitles(job):

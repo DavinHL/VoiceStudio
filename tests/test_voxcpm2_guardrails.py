@@ -122,11 +122,11 @@ def test_ref_prep_trims_edge_silence(tmp_path, fresh_ref_cache):
     prepared = tts_backend._prepare_voxcpm_ref(raw)
     assert prepared != raw
     audio, sr = sf.read(prepared, dtype="float32")
-    # 0.5 s of speech + the 50 ms edge pad on each side.
-    assert abs(len(audio) / sr - 0.6) < 0.02
+    # 0.5 s of speech + a hair at the head and the tail pad (#3926).
+    assert abs(len(audio) / sr - 0.552) < 0.02
     # Leading silence really gone: speech starts within the edge pad.
     first_voiced = np.flatnonzero(np.abs(audio) > 0.01)[0]
-    assert first_voiced / sr <= 0.06
+    assert first_voiced / sr <= 0.01
 
 
 def test_ref_prep_caps_length(tmp_path, fresh_ref_cache):

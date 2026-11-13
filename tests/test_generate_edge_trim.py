@@ -13,7 +13,9 @@ from api.routers import generation as gen
 from api.routers import openai_compat as oc
 
 SR = 1000  # 1 sample per ms keeps the arithmetic readable
-MARGIN = 50  # trim_speech_padding keeps 50 ms of context
+HEAD = 2  # trim_speech_padding keeps 2 ms of context before the first sound
+TAIL = 50  # ...and 50 ms after the last one, to keep a word's release
+MARGIN = HEAD + TAIL  # total samples a trimmed take keeps around its speech
 
 
 def _padded(lead=400, speech=1000, tail=600):
@@ -31,7 +33,16 @@ def no_dsp(monkeypatch):
 
 def test_whole_take_trim_strips_engine_padding(no_dsp):
     out = gen._apply_effect_chain(_padded(), SR, "broadcast", trim_edges=True)
-    assert out.shape[-1] == 1000 + 2 * MARGIN
+    assert out.shape[-1] == 1000 + HEAD + TAIL
+
+
+def test_trimmed_take_opens_on_its_sound(no_dsp):
+    # #3926: the engine's leading block of digital silence used to survive as
+    # 50 ms of blank before the first word, which read as a clipped opening.
+    out = gen._apply_effect_chain(_padded(), SR, "broadcast", trim_edges=True)
+    # Only the head context is silent; the speech starts right after it.
+    assert torch.all(out[..., :HEAD] == 0)
+    assert torch.all(out[..., HEAD:HEAD + 100] != 0)
 
 
 def test_preview_chunks_and_raw_keep_their_edges(no_dsp):
@@ -55,7 +66,7 @@ def test_wants_edge_trim(preset, duration, expected):
 def test_pause_spans_trimmed_so_requested_pause_is_exact():
     segs = [("", 300), ("hello", 500), ("world", 200)]
     out = gen._render_with_pauses(lambda t: _padded(), segs, SR, trim_spans=True)
-    span = 1000 + 2 * MARGIN
+    span = 1000 + HEAD + TAIL
     # Deliberate leading and trailing pauses survive; engine padding does not.
     assert out.shape[-1] == 300 + span + 500 + span + 200
     assert torch.all(out[:, :300] == 0)
@@ -83,7 +94,7 @@ def openai_tts(monkeypatch):
 
 
 def test_openai_speech_trims_edges(openai_tts):
-    assert openai_tts({}).shape[-1] == 1000 + 2 * MARGIN
+    assert openai_tts({}).shape[-1] == 1000 + HEAD + TAIL
 
 
 def test_openai_speech_keeps_explicit_duration(openai_tts):
