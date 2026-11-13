@@ -729,7 +729,20 @@
     "seed_keep": "이 시드 유지",
     "seed_reroll": "새 시드",
     "stop_playback": "재생 중지",
-    "title": "음성 복제"
+    "title": "음성 복제",
+    "cut_reference": "참조 오디오 자르기",
+    "cut_reference_hint": "이 녹음에서 한 구간만 남깁니다. 엔진은 긴 클립에서 자체적으로 몇 초를 선택하므로, 여기서 자르는 것이 음성의 어느 부분을 복사할지 결정합니다.",
+    "cut_start": "시작",
+    "cut_end": "끝",
+    "cut_seconds": "{{seconds}}초",
+    "cut_keeps": "녹음에서 {{seconds}}초를 유지합니다.",
+    "cut_keep_transcript": "현재 전사 유지",
+    "cut_apply": "클립 자르기",
+    "transcribe_missing": "비어 있는 전사 채우기",
+    "transcribe_progress": "전사 중 {{done}}/{{total}}",
+    "transcribe_remaining": " · {{count}}개 남음",
+    "transcribe_already_running": "이미 전사가 진행 중입니다.",
+    "transcribe_failed": "전사를 시작할 수 없습니다: {{message}}"
   },
   "designWorkspace": {
     "title": "디자인",

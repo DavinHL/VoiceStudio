@@ -729,7 +729,20 @@
     "replace_reference_hint": "儲存後將替換此音色的參考樣本。由於新片段可能來自其他說話者，已鎖定的片段和本人聲音驗證會被清除。逐字稿留空即可自動轉寫新片段。",
     "cannotCloneUseDesign": "此模型無法複製聲音。請在聲音設計中描述一個聲音，或選擇支援複製的模型。",
     "savedTab": "已儲存",
-    "recentsTab": "最近"
+    "recentsTab": "最近",
+    "cut_reference": "裁剪參考音訊",
+    "cut_reference_hint": "只保留這段錄音的一個片段。引擎會從長音訊中自行選取幾秒，因此在這裡裁剪才決定它們複製聲音的哪一部分。",
+    "cut_start": "開始",
+    "cut_end": "結束",
+    "cut_seconds": "{{seconds}} 秒",
+    "cut_keeps": "保留錄音中的 {{seconds}} 秒。",
+    "cut_keep_transcript": "保留目前轉寫文字",
+    "cut_apply": "裁剪音訊",
+    "transcribe_missing": "補齊缺少的轉寫文字",
+    "transcribe_progress": "正在轉寫 {{done}}/{{total}}",
+    "transcribe_remaining": " · 剩餘 {{count}}",
+    "transcribe_already_running": "轉寫工作已在進行中。",
+    "transcribe_failed": "無法開始轉寫：{{message}}"
   },
   "designWorkspace": {
     "title": "設計聲音",

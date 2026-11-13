@@ -744,7 +744,20 @@
     "toggle_sidebar": "切换侧边栏",
     "transcript": "转写文本",
     "tshift": "t_shift",
-    "voice_source": "声音来源"
+    "voice_source": "声音来源",
+    "cut_reference": "裁剪参考音频",
+    "cut_reference_hint": "只保留这段录音的一个片段。引擎会从长音频中自行选取几秒，因此在这里裁剪才决定它们复制声音的哪一部分。",
+    "cut_start": "开始",
+    "cut_end": "结束",
+    "cut_seconds": "{{seconds}} 秒",
+    "cut_keeps": "保留录音中的 {{seconds}} 秒。",
+    "cut_keep_transcript": "保留当前转写文本",
+    "cut_apply": "裁剪音频",
+    "transcribe_missing": "补全缺失的转写文本",
+    "transcribe_progress": "正在转写 {{done}}/{{total}}",
+    "transcribe_remaining": " · 剩余 {{count}}",
+    "transcribe_already_running": "转写任务已在进行中。",
+    "transcribe_failed": "无法开始转写：{{message}}"
   },
   "designWorkspace": {
     "title": "设计",

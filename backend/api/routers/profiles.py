@@ -107,6 +107,235 @@ class ProfileUpdate(BaseModel):
     personality: Optional[str] = None
 
 
+# ── Bulk reference transcription (#3925) ────────────────────────────────
+#
+# Filling transcripts one profile at a time means opening every voice, waiting
+# for ASR on each, and typing nothing; the work is identical for all of them,
+# so one button should do the whole library. The run is a single background
+# job rather than a request loop, because each clip costs a Whisper pass and a
+# library of twenty voices would hold an HTTP request open for minutes.
+#
+# The job keeps only its own progress; the transcripts land on the profiles as
+# each clip finishes, so stopping halfway still leaves the library better than
+# it started.
+_bulk_transcribe_job: Optional[dict] = None
+_bulk_transcribe_task: Optional[asyncio.Task] = None
+
+
+def _bulk_transcribe_row(profile_id: str, name: str) -> dict:
+    return {"id": profile_id, "name": name, "status": "pending", "ref_text": "", "error": None}
+
+
+def _bulk_transcribe_snapshot() -> dict:
+    """Copy of the running job's state, safe to return from a request."""
+    job = _bulk_transcribe_job
+    if not job:
+        return {"status": "idle", "total": 0, "done": 0, "skipped": 0, "failed": 0, "profiles": []}
+    return {
+        "status": job["status"],
+        "total": job["total"],
+        "done": job["done"],
+        "skipped": job["skipped"],
+        "failed": job["failed"],
+        "profiles": [dict(entry) for entry in job["profiles"]],
+    }
+
+
+def _transcribable_profiles() -> list:
+    """Saved clones with a reference clip on disk that no transcript covers.
+
+    A profile with a locked take is transcribed from its reference like any
+    other: the lock pairs a take with text, and a missing reference transcript
+    is still the thing renders fall back to.
+    """
+    with db_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, name, ref_audio_path, locked_audio_path, ref_text "
+            "FROM voice_profiles WHERE COALESCE(kind, 'clone')='clone' "
+            "AND ref_audio_path IS NOT NULL AND ref_audio_path != '' "
+            "ORDER BY created_at DESC",
+        ).fetchall()
+    pending = []
+    for row in rows:
+        if (row["ref_text"] or "").strip():
+            continue  # already has a transcript; nothing to fill
+        path = _voices_path(str(row["ref_audio_path"]))
+        if path and os.path.isfile(path):
+            pending.append((row["id"], row["name"] or row["id"], path))
+    return pending
+
+
+async def _transcribe_clip(audio_path: str) -> str:
+    """Transcribe a reference clip, letting a failure reach the caller.
+
+    ``_auto_transcribe_reference`` is deliberately forgiving because a profile
+    must stay saveable without an ASR. A bulk run needs the opposite: a clip
+    that could not be read is a failure to report, not a silence to skip.
+    """
+    timeout = _reference_transcribe_timeout()
+    from services.asr_backend import transcribe_reference
+
+    return (await asyncio.wait_for(
+        asyncio.to_thread(transcribe_reference, audio_path), timeout,
+    ) or "").strip()
+
+
+async def _run_bulk_transcribe(job: dict, pending: list) -> None:
+    """Transcribe each pending reference in turn, updating the job as it goes.
+
+    Sequential by design: the ASR model is a single GPU/CPU resident, so
+    parallel clips would thrash memory rather than finish sooner. One clip's
+    failure is recorded and the run continues — a single unreadable recording
+    must not cost the user the other nineteen transcripts.
+    """
+    for profile_id, _name, path in pending:
+        entry = next(e for e in job["profiles"] if e["id"] == profile_id)
+        if job["status"] == "cancelled":
+            return
+        entry["status"] = "running"
+        try:
+            # Call the ASR directly rather than through
+            # _auto_transcribe_reference: that helper swallows every failure to
+            # keep profile save usable, which would report a broken decoder as
+            # "no speech in this clip" and hide a real error from the user.
+            text = (await _transcribe_clip(path) or "").strip()
+        except Exception as exc:  # noqa: BLE001 — one clip must not end the run
+            logger.warning("bulk reference transcription failed for %s: %s", profile_id, exc)
+            entry["status"] = "failed"
+            entry["error"] = str(exc)
+            job["failed"] += 1
+            continue
+        if not text:
+            entry["status"] = "skipped"
+            entry["error"] = "No speech was recognised in this clip."
+            job["skipped"] += 1
+            continue
+        # Only fill a still-empty transcript: a run started before the user
+        # typed a correction must not overwrite it (#3925). The row is written
+        # per clip so an interrupted run keeps everything already done.
+        with db_conn() as conn:
+            cur = conn.execute(
+                "UPDATE voice_profiles SET ref_text=? WHERE id=? "
+                "AND (ref_text IS NULL OR TRIM(ref_text)='')",
+                (text, profile_id),
+            )
+            wrote = cur.rowcount > 0
+        entry["ref_text"] = text
+        if wrote:
+            entry["status"] = "done"
+            job["done"] += 1
+            event_bus.emit("profiles", {"action": "updated", "id": profile_id})
+        else:
+            entry["status"] = "skipped"
+            entry["error"] = "A transcript was saved for this voice while the run was working."
+            job["skipped"] += 1
+    job["status"] = "done"
+
+
+class BulkTranscribeRequest(BaseModel):
+    # Re-run over voices that already have a transcript, for a library filled
+    # by an earlier engine choice or a clip that has since been replaced.
+    include_transcribed: bool = False
+
+
+@router.post("/profiles/transcripts/auto")
+async def start_bulk_transcribe(request: BulkTranscribeRequest = BulkTranscribeRequest()):
+    """Fill a transcript for every reference clip that has none (#3925).
+
+    Returns immediately with the job's initial state; poll
+    ``GET /profiles/transcripts/auto`` for progress. Only one run exists at a
+    time — a second request reports the run already in flight rather than
+    starting a competing pass over the same clips.
+    """
+    global _bulk_transcribe_job, _bulk_transcribe_task
+    if _bulk_transcribe_job and _bulk_transcribe_job["status"] == "running":
+        return {**_bulk_transcribe_snapshot(), "started": False}
+    pending = await asyncio.to_thread(_transcribable_profiles)
+    if request.include_transcribed:
+        pending = await asyncio.to_thread(_all_reference_profiles)
+    job = {
+        "status": "running",
+        "total": len(pending),
+        "done": 0,
+        "skipped": 0,
+        "failed": 0,
+        "profiles": [_bulk_transcribe_row(pid, name) for pid, name, _path in pending],
+    }
+    _bulk_transcribe_job = job
+    if pending:
+        _bulk_transcribe_task = _start_bulk_transcribe_thread(job, pending)
+    else:
+        job["status"] = "done"
+    return {**_bulk_transcribe_snapshot(), "started": True}
+
+
+def _start_bulk_transcribe_thread(job: dict, pending: list) -> threading.Thread:
+    """Run the bulk pass on its own event loop in a worker thread.
+
+    A run outlives the request that started it, and the request's loop belongs
+    to whoever handled the POST. Giving the run a private loop means progress
+    is identical whether the app is served by uvicorn or driven by a test
+    client, and a long pass is never cancelled by a request finishing.
+    """
+
+    def worker() -> None:
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(_run_bulk_transcribe(job, pending))
+        except Exception as exc:  # noqa: BLE001 — a crashed run must report, not hang
+            logger.exception("bulk reference transcription crashed: %s", exc)
+            job["status"] = "done"
+        finally:
+            with contextlib.suppress(RuntimeError):
+                loop.close()
+
+    thread = threading.Thread(
+        target=worker, name="bulk-reference-transcribe", daemon=True,
+    )
+    thread.start()
+    return thread
+
+
+def _all_reference_profiles() -> list:
+    """Every saved clone with a readable reference clip, transcripts included."""
+    with db_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, name, ref_audio_path FROM voice_profiles "
+            "WHERE COALESCE(kind, 'clone')='clone' "
+            "AND ref_audio_path IS NOT NULL AND ref_audio_path != '' "
+            "ORDER BY created_at DESC",
+        ).fetchall()
+    found = []
+    for row in rows:
+        path = _voices_path(str(row["ref_audio_path"]))
+        if path and os.path.isfile(path):
+            found.append((row["id"], row["name"] or row["id"], path))
+    return found
+
+
+@router.get("/profiles/transcripts/auto")
+def bulk_transcribe_status():
+    """Progress of the current or most recent bulk transcription run (#3925)."""
+    return _bulk_transcribe_snapshot()
+
+
+@router.delete("/profiles/transcripts/auto")
+async def cancel_bulk_transcribe():
+    """Stop the running bulk transcription after the clip in flight (#3925).
+
+    Transcripts already written stay: the run fills a column per clip, so
+    stopping is always safe and resumable.
+    """
+    job = _bulk_transcribe_job
+    if not job or job["status"] != "running":
+        return {"cancelled": False, **_bulk_transcribe_snapshot()}
+    job["status"] = "cancelled"
+    for entry in job["profiles"]:
+        if entry["status"] in ("pending", "running"):
+            entry["status"] = "cancelled"
+    return {"cancelled": True, **_bulk_transcribe_snapshot()}
+
+
 @router.get("/personalities")
 def list_personalities():
     """Return built-in voice personality presets."""
@@ -783,6 +1012,213 @@ async def replace_profile_audio(
     await _sweep_retired_off_loop()
     event_bus.emit("profiles", {"action": "updated", "id": profile_id})
     return _profile_record(updated)
+
+
+class ReferenceTrim(BaseModel):
+    """A half-open ``[start_s, end_s)`` window of the reference clip."""
+
+    start_s: float
+    end_s: float
+    # The stored transcript describes the WHOLE previous clip, so it cannot be
+    # kept for a window of it. When true the caller keeps the text as-is (it
+    # knows the cut keeps one utterance); otherwise the field is cleared and a
+    # later render re-transcribes the shortened clip.
+    keep_transcript: bool = False
+
+
+# A cut is a trim of a clip a human is listening to, so both bounds are
+# checked against the real duration: an out-of-range window is a bug in the
+# caller, not something to silently clamp into a different clip.
+_MIN_TRIM_SECONDS = 0.5
+_MAX_TRIM_SECONDS = 600.0
+# A cut is written beside its target and renamed over it, so a failed cut never
+# leaves a half-written clip an engine could load.
+_STAGING_SUFFIX = ".part"
+
+
+@router.post("/profiles/{profile_id}/audio/trim")
+async def trim_profile_audio(profile_id: str, trim: ReferenceTrim):
+    """Cut a saved clone's reference clip down to ``[start_s, end_s)`` (#3925).
+
+    The clip the engines actually read is rewritten, not just the playback
+    range: an engine that picks its own window from a long clip (OmniVoice,
+    ``ref_strategy="best_window"``) picks by speech density, so a clip that
+    opens with speech and ends in a chorus clones the chorus. Cutting the file
+    is the only way to say which passage is the voice.
+
+    The new clip is written under a NEW versioned filename like
+    :func:`replace_profile_audio`, so every cache keyed by the reference path
+    (engine prompt, prepared reference, chapter renders) is invalidated at
+    once. The cut is lossless in the sense that a WAV reference stays a WAV
+    reference; compressed sources are re-encoded once at the same parameters.
+    """
+    not_found = HTTPException(
+        status_code=404,
+        detail="That voice profile doesn't exist. It may have been deleted from another tab.",
+    )
+    if not _PROFILE_ID_RE.fullmatch(profile_id or ""):
+        raise not_found
+    if not (trim.start_s == trim.start_s and trim.end_s == trim.end_s):  # NaN
+        raise HTTPException(status_code=422, detail="The cut range must be a pair of numbers.")
+    if trim.end_s - trim.start_s < _MIN_TRIM_SECONDS:
+        raise HTTPException(
+            status_code=422,
+            detail="Keep at least half a second of the recording — a shorter clip is too little for the engine to learn a voice from.",
+        )
+    if trim.end_s - trim.start_s > _MAX_TRIM_SECONDS:
+        raise HTTPException(
+            status_code=422,
+            detail="A reference clip is at most ten minutes. Cut it into a shorter passage.",
+        )
+    if trim.start_s < 0:
+        raise HTTPException(status_code=422, detail="The cut cannot start before the clip does.")
+    lock = _replace_locks.get(profile_id)
+    if lock is None:
+        lock = _replace_locks[profile_id] = asyncio.Lock()
+    async with lock:
+        with db_conn() as conn:
+            row = conn.execute(
+                "SELECT kind, ref_audio_path, locked_audio_path, ref_text, consent_audio_path "
+                "FROM voice_profiles WHERE id=?",
+                (profile_id,),
+            ).fetchone()
+        if not row:
+            raise not_found
+        if (row["kind"] or "clone") != "clone":
+            raise HTTPException(
+                status_code=409,
+                detail="Only a recorded voice has a reference clip to cut. A designed voice is defined by its traits.",
+            )
+        source = _voices_path(str(row["ref_audio_path"] or ""))
+        if not source or not os.path.isfile(source):
+            raise HTTPException(
+                status_code=404,
+                detail="This voice has no reference recording to cut yet. Add one first.",
+            )
+        from services.tts_backend import reference_duration_s
+
+        duration = await asyncio.to_thread(reference_duration_s, source)
+        if duration is None:
+            raise HTTPException(
+                status_code=422,
+                detail="That recording could not be read, so its length is unknown. Replace it instead.",
+            )
+        # Clamp to the real clip: a stale waveform (a second tab replaced the
+        # reference) must not cut at a time the file does not have.
+        start_s = max(0.0, min(trim.start_s, duration))
+        end_s = max(start_s, min(trim.end_s, duration))
+        if end_s - start_s < _MIN_TRIM_SECONDS:
+            raise HTTPException(
+                status_code=422,
+                detail="That cut would leave less than half a second of audio. Pick a wider range.",
+            )
+        # ``ref_audio_path`` is first by construction: the read above selects
+        # it, and a locked take is a separate tier the engine only prefers.
+        extension = os.path.splitext(str(row["ref_audio_path"]))[1].lower() or ".wav"
+        new_filename = f"{profile_id}-{uuid.uuid4().hex[:8]}{extension}"
+        new_path = _voices_path(new_filename)
+        if new_path is None:  # profile_id is charset-checked above; belt and braces
+            raise not_found
+        os.makedirs(VOICES_DIR, exist_ok=True)
+        tmp_path = f"{new_path}{_STAGING_SUFFIX}"
+        try:
+            await _cut_audio(source, tmp_path, start_s, end_s)
+            if os.path.getsize(tmp_path) < _MIN_REF_AUDIO_BYTES:
+                raise HTTPException(
+                    status_code=422,
+                    detail="That cut left almost no audio. Pick a wider range.",
+                )
+            os.replace(tmp_path, new_path)
+            if not await _is_decodable_audio(new_path):
+                raise HTTPException(
+                    status_code=422,
+                    detail="The cut recording could not be read back as audio. Try a different range.",
+                )
+            new_text = (row["ref_text"] or "") if trim.keep_transcript else ""
+            with db_conn() as conn:
+                cur = conn.execute(
+                    "UPDATE voice_profiles SET ref_audio_path=?, ref_text=?, "
+                    "locked_audio_path='', is_locked=0, seed=NULL, "
+                    "verified_own_voice=0, consent_text='', consent_audio_path='', "
+                    "consent_recorded_at=NULL, consent_basis='', consent_attested_at=NULL "
+                    "WHERE id=? AND COALESCE(kind, 'clone')='clone' AND ref_audio_path IS ?",
+                    (new_filename, new_text, profile_id, row["ref_audio_path"]),
+                )
+                if cur.rowcount == 0:
+                    still_there = conn.execute(
+                        "SELECT 1 FROM voice_profiles WHERE id=?", (profile_id,),
+                    ).fetchone()
+                    if not still_there:
+                        raise not_found
+                    raise HTTPException(
+                        status_code=409,
+                        detail="This voice changed while the cut was being made. Reopen it and try again.",
+                    )
+                updated = conn.execute(
+                    "SELECT * FROM voice_profiles WHERE id=?", (profile_id,),
+                ).fetchone()
+        except BaseException:
+            for leftover in (tmp_path, new_path):
+                with contextlib.suppress(OSError):
+                    os.remove(leftover)
+            raise
+        # A cut changes which passage a clone copies, so the same identity
+        # fields a replaced clip clears are cleared here too.
+        for column in ("ref_audio_path", "locked_audio_path"):
+            _retire_voice_file(row[column], keep=new_filename)
+        _remove_voice_file(row["consent_audio_path"], keep=new_filename)
+    await _sweep_retired_off_loop()
+    event_bus.emit("profiles", {"action": "updated", "id": profile_id})
+    return _profile_record(updated)
+
+
+async def _cut_audio(source: str, dest: str, start_s: float, end_s: float) -> None:
+    """Write ``source``'s ``[start_s, end_s)`` window to ``dest`` with ffmpeg.
+
+    ``-ss``/``-t`` before ``-i`` seek the input instead of decoding and
+    discarding everything ahead of the window, which matters on a reference
+    that is minutes long. The container is chosen from the destination suffix,
+    so a WAV reference is cut to an uncompressed WAV an engine reads directly.
+
+    ``dest`` is the router's ``*.part`` staging file, so the format cannot be
+    left to ffmpeg's extension sniffing — that name has no usable suffix.
+    """
+    from services.ffmpeg_utils import find_ffmpeg, run_ffmpeg
+
+    ffmpeg = find_ffmpeg()
+    # Strip the staging suffix before choosing a container.
+    stem = dest[:-len(_STAGING_SUFFIX)] if dest.endswith(_STAGING_SUFFIX) else dest
+    suffix = os.path.splitext(stem)[1].lower()
+    if suffix == ".wav":
+        codec = ["-c:a", "pcm_s16le"]
+        container = ["-f", "wav"]
+    elif suffix == ".mp3":
+        codec = ["-c:a", "libmp3lame", "-q:a", "2"]
+        container = ["-f", "mp3"]
+    else:
+        codec = []
+        container = []
+    cmd = [
+        ffmpeg, "-y", "-loglevel", "error",
+        "-ss", f"{start_s:.3f}", "-t", f"{end_s - start_s:.3f}",
+        "-i", source,
+        *codec,
+        *container,
+        dest,
+    ]
+    try:
+        rc, _, stderr = await run_ffmpeg(cmd, timeout=300.0)
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=504, detail="Cutting that recording took too long. Try again.",
+        ) from exc
+    if rc != 0:
+        detail = stderr.decode(errors="replace").strip() if stderr else "no diagnostic"
+        logger.warning("reference cut failed for %s: %s", os.path.basename(source), detail)
+        raise HTTPException(
+            status_code=422,
+            detail="That recording could not be cut. Replace it instead.",
+        )
 
 
 @router.get("/profiles/{profile_id}/usage")

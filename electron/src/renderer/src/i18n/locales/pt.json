@@ -731,7 +731,20 @@
     "replace_reference_hint": "Salvar substitui a amostra de referência desta voz. A tomada bloqueada e a verificação de voz própria são removidas porque o novo clipe pode ser de outra pessoa. Deixe a transcrição em branco para transcrever o novo clipe automaticamente.",
     "cannotCloneUseDesign": "Este modelo não consegue clonar uma voz. Descreva uma em Design de voz ou escolha um modelo que clone.",
     "savedTab": "Salvas",
-    "recentsTab": "Recentes"
+    "recentsTab": "Recentes",
+    "cut_reference": "Cortar referência",
+    "cut_reference_hint": "Mantenha apenas uma passagem desta gravação. Os motores escolhem sozinhos os seus segundos de um clipe longo, por isso cortar aqui é o que decide que parte da voz eles copiam.",
+    "cut_start": "Início",
+    "cut_end": "Fim",
+    "cut_seconds": "{{seconds}} s",
+    "cut_keeps": "Mantém {{seconds}} s da gravação.",
+    "cut_keep_transcript": "Manter a transcrição atual",
+    "cut_apply": "Cortar clipe",
+    "transcribe_missing": "Preencher transcrições ausentes",
+    "transcribe_progress": "Transcrevendo {{done}}/{{total}}",
+    "transcribe_remaining": " · faltam {{count}}",
+    "transcribe_already_running": "Já existe uma transcrição em andamento.",
+    "transcribe_failed": "Não foi possível iniciar a transcrição: {{message}}"
   },
   "designWorkspace": {
     "title": "Desenhar",

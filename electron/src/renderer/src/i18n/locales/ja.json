@@ -729,7 +729,20 @@
     "replace_reference_hint": "保存すると、この音声の参照サンプルが置き換わります。新しいクリップは別の話者の可能性があるため、固定したテイクと本人音声の確認はリセットされます。書き起こしを空欄にすると、新しいクリップを自動で書き起こします。",
     "cannotCloneUseDesign": "このモデルは声をクローンできません。ボイスデザインで声を説明するか、クローン対応モデルを選んでください。",
     "savedTab": "保存済み",
-    "recentsTab": "最近"
+    "recentsTab": "最近",
+    "cut_reference": "参照音声をカット",
+    "cut_reference_hint": "この録音から一区間だけを残します。長いクリップからエンジンが独自に数秒を選ぶため、どの部分を複製するかはここでのカットで決まります。",
+    "cut_start": "開始",
+    "cut_end": "終了",
+    "cut_seconds": "{{seconds}} 秒",
+    "cut_keeps": "録音の {{seconds}} 秒を保持します。",
+    "cut_keep_transcript": "現在の書き起こしを保持",
+    "cut_apply": "クリップをカット",
+    "transcribe_missing": "未入力の書き起こしを補完",
+    "transcribe_progress": "書き起こし中 {{done}}/{{total}}",
+    "transcribe_remaining": " · 残り {{count}}",
+    "transcribe_already_running": "書き起こしはすでに実行中です。",
+    "transcribe_failed": "書き起こしを開始できませんでした: {{message}}"
   },
   "designWorkspace": {
     "title": "デザイン",

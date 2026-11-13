@@ -731,7 +731,20 @@
     "replace_reference_hint": "L'enregistrement remplace l'échantillon de référence de cette voix. La prise verrouillée et la vérification de votre propre voix sont effacées, car le nouveau clip peut provenir d'une autre personne. Laissez la transcription vide pour transcrire automatiquement le nouveau clip.",
     "cannotCloneUseDesign": "Ce modèle ne peut pas cloner une voix. Décrivez-en une dans Conception de voix ou choisissez un modèle qui clone.",
     "savedTab": "Enregistrées",
-    "recentsTab": "Récentes"
+    "recentsTab": "Récentes",
+    "cut_reference": "Découper la référence",
+    "cut_reference_hint": "Ne gardez qu'un passage de cet enregistrement. Les moteurs choisissent eux-mêmes leurs quelques secondes dans un clip long ; c'est donc ce découpage qui décide quelle partie de la voix ils copient.",
+    "cut_start": "Début",
+    "cut_end": "Fin",
+    "cut_seconds": "{{seconds}} s",
+    "cut_keeps": "Conserve {{seconds}} s de l'enregistrement.",
+    "cut_keep_transcript": "Conserver la transcription actuelle",
+    "cut_apply": "Découper le clip",
+    "transcribe_missing": "Remplir les transcriptions manquantes",
+    "transcribe_progress": "Transcription {{done}}/{{total}}",
+    "transcribe_remaining": " · {{count}} restantes",
+    "transcribe_already_running": "Une transcription est déjà en cours.",
+    "transcribe_failed": "Impossible de démarrer la transcription : {{message}}"
   },
   "designWorkspace": {
     "title": "Concevoir",

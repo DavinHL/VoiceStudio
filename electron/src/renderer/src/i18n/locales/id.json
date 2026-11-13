@@ -729,7 +729,20 @@
     "replace_reference_hint": "Menyimpan akan mengganti sampel referensi suara ini. Take yang dikunci dan verifikasi suara sendiri dihapus karena klip baru mungkin berasal dari pembicara lain. Biarkan transkrip kosong untuk mentranskripsikan klip baru secara otomatis.",
     "cannotCloneUseDesign": "Model ini tidak bisa mengkloning suara. Deskripsikan suara di Desain suara, atau pilih model yang bisa mengkloning.",
     "savedTab": "Tersimpan",
-    "recentsTab": "Terbaru"
+    "recentsTab": "Terbaru",
+    "cut_reference": "Potong referensi",
+    "cut_reference_hint": "Simpan hanya satu bagian dari rekaman ini. Mesin memilih beberapa detiknya sendiri dari klip panjang, jadi memotong di sini yang menentukan bagian suara mana yang disalin.",
+    "cut_start": "Mulai",
+    "cut_end": "Selesai",
+    "cut_seconds": "{{seconds}} dtk",
+    "cut_keeps": "Menyimpan {{seconds}} dtk dari rekaman.",
+    "cut_keep_transcript": "Pertahankan transkrip saat ini",
+    "cut_apply": "Potong klip",
+    "transcribe_missing": "Isi transkrip yang kosong",
+    "transcribe_progress": "Menranskrip {{done}}/{{total}}",
+    "transcribe_remaining": " · sisa {{count}}",
+    "transcribe_already_running": "Proses transkrip sedang berjalan.",
+    "transcribe_failed": "Gagal memulai transkrip: {{message}}"
   },
   "designWorkspace": {
     "title": "Desain",

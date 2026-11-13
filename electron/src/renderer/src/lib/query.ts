@@ -21,6 +21,7 @@ export const queryClient = new QueryClient({
 
 export const queryKeys = {
   profiles: ['profiles'] as const,
+  bulkTranscribe: ['profiles', 'transcripts', 'auto'] as const,
   history: ['history'] as const,
   engines: ['engines'] as const,
   systemInfo: ['system', 'info'] as const,

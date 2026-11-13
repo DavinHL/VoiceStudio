@@ -640,7 +640,20 @@
     "replace_reference_hint": "Ao gardar substitúe a mostra de referencia desta voz. Borráronse a súa toma bloqueada e a verificación de voz propia porque o novo clip pode ser un altofalante diferente. Deixa a transcrición en branco para transcribir o novo clip automaticamente.",
     "cannotCloneUseDesign": "Este modelo non pode clonar unha voz. Describe un en Deseño de voz ou escolle un modelo que clone.",
     "savedTab": "Gardado",
-    "recentsTab": "Recentes"
+    "recentsTab": "Recentes",
+    "cut_reference": "Recortar a referencia",
+    "cut_reference_hint": "Conserva só un treito desta gravación. Os motores escollen os seus propios segundos dun clip longo, así que recortalo aquí decide que parte da voz copian.",
+    "cut_start": "Inicio",
+    "cut_end": "Fin",
+    "cut_seconds": "{{seconds}} s",
+    "cut_keeps": "Conserva {{seconds}} s da gravación.",
+    "cut_keep_transcript": "Conservar a transcrición actual",
+    "cut_apply": "Recortar o clip",
+    "transcribe_missing": "Encher as transcricións que faltan",
+    "transcribe_progress": "Transcribindo {{done}}/{{total}}",
+    "transcribe_remaining": " · quedan {{count}}",
+    "transcribe_already_running": "Xa hai unha transcrición en curso.",
+    "transcribe_failed": "Non se puido iniciar a transcrición: {{message}}"
   },
   "recording": {
     "cleaned_loaded": "Gravación limpa e cargada.",

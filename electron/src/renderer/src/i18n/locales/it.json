@@ -731,7 +731,20 @@
     "replace_reference_hint": "Il salvataggio sostituisce il campione di riferimento di questa voce. La ripresa bloccata e la verifica della propria voce vengono cancellate perché la nuova clip potrebbe essere di un'altra persona. Lascia vuota la trascrizione per trascrivere automaticamente la nuova clip.",
     "cannotCloneUseDesign": "Questo modello non può clonare una voce. Descrivine una in Design vocale o scegli un modello che clona.",
     "savedTab": "Salvate",
-    "recentsTab": "Recenti"
+    "recentsTab": "Recenti",
+    "cut_reference": "Taglia riferimento",
+    "cut_reference_hint": "Mantieni solo un passaggio di questa registrazione. I motori scelgono da soli i loro secondi da un clip lungo, quindi tagliare qui è ciò che decide quale parte della voce copieranno.",
+    "cut_start": "Inizio",
+    "cut_end": "Fine",
+    "cut_seconds": "{{seconds}} s",
+    "cut_keeps": "Mantiene {{seconds}} s della registrazione.",
+    "cut_keep_transcript": "Mantieni la trascrizione attuale",
+    "cut_apply": "Taglia clip",
+    "transcribe_missing": "Riempi le trascrizioni mancanti",
+    "transcribe_progress": "Trascrizione {{done}}/{{total}}",
+    "transcribe_remaining": " · {{count}} rimasti",
+    "transcribe_already_running": "Una trascrizione è già in corso.",
+    "transcribe_failed": "Impossibile avviare la trascrizione: {{message}}"
   },
   "designWorkspace": {
     "title": "Progetta",

@@ -749,7 +749,20 @@
     "replace_reference_hint": "يؤدي الحفظ إلى استبدال العينة المرجعية لهذا الصوت. يُمسح المقطع المقفل والتحقق من الصوت الشخصي لأن المقطع الجديد قد يكون لمتحدث مختلف. اترك النص فارغًا لتفريغ المقطع الجديد تلقائيًا.",
     "cannotCloneUseDesign": "لا يستطيع هذا النموذج استنساخ صوت. صِف صوتًا في تصميم الصوت، أو اختر نموذجًا يدعم الاستنساخ.",
     "savedTab": "المحفوظة",
-    "recentsTab": "الأخيرة"
+    "recentsTab": "الأخيرة",
+    "cut_reference": "قص المرجع",
+    "cut_reference_hint": "احتفظ بمقطع واحد فقط من هذا التسجيل. تختار المحركات ثوانيها بنفسها من مقطع طويل، لذا فإن القص هنا هو ما يحدد الجزء الذي تنسخه من الصوت.",
+    "cut_start": "البداية",
+    "cut_end": "النهاية",
+    "cut_seconds": "{{seconds}} ث",
+    "cut_keeps": "يحتفظ بـ {{seconds}} ث من التسجيل.",
+    "cut_keep_transcript": "الاحتفاظ بالنص الحالي",
+    "cut_apply": "قص المقطع",
+    "transcribe_missing": "تعبئة النصوص الناقصة",
+    "transcribe_progress": "جارٍ نسخ {{done}}/{{total}}",
+    "transcribe_remaining": " · يتبقى {{count}}",
+    "transcribe_already_running": "هناك عملية نسخ قيد التنفيذ بالفعل.",
+    "transcribe_failed": "تعذر بدء النسخ: {{message}}"
   },
   "designWorkspace": {
     "title": "تصميم",

@@ -729,7 +729,20 @@
     "replace_reference_hint": "Khi lưu, mẫu tham chiếu của giọng này sẽ được thay thế. Bản thu đã khóa và xác minh giọng của chính bạn sẽ bị xóa vì đoạn mới có thể là của người nói khác. Để trống bản chép lời để tự động chép lời đoạn mới.",
     "cannotCloneUseDesign": "Mô hình này không thể nhân bản giọng. Hãy mô tả giọng trong Thiết kế giọng, hoặc chọn mô hình hỗ trợ nhân bản.",
     "savedTab": "Đã lưu",
-    "recentsTab": "Gần đây"
+    "recentsTab": "Gần đây",
+    "cut_reference": "Cắt bản tham chiếu",
+    "cut_reference_hint": "Chỉ giữ một đoạn của bản ghi này. Các engine tự chọn vài giây của riêng chúng từ một clip dài, nên cắt ở đây chính là điều quyết định phần giọng nào được sao chép.",
+    "cut_start": "Bắt đầu",
+    "cut_end": "Kết thúc",
+    "cut_seconds": "{{seconds}} giây",
+    "cut_keeps": "Giữ {{seconds}} giây của bản ghi.",
+    "cut_keep_transcript": "Giữ bản chép lời hiện tại",
+    "cut_apply": "Cắt clip",
+    "transcribe_missing": "Điền bản chép lời còn thiếu",
+    "transcribe_progress": "Đang chép lời {{done}}/{{total}}",
+    "transcribe_remaining": " · còn {{count}}",
+    "transcribe_already_running": "Đang có một lượt chép lời chạy.",
+    "transcribe_failed": "Không thể bắt đầu chép lời: {{message}}"
   },
   "designWorkspace": {
     "title": "Thiết kế",

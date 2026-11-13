@@ -12,6 +12,9 @@ vi.mock('@/lib/store/workspace', () => ({
 }));
 vi.mock('./voices-sidebar', () => ({ SavedVoices: () => <div>voice library</div> }));
 vi.mock('./edit-profile', () => ({ EditProfile: () => null }));
+// The transcript-fill control owns its own query hooks; this page test only
+// asserts the header's navigation.
+vi.mock('./bulk-transcribe-button', () => ({ BulkTranscribeButton: () => null }));
 vi.mock('@/components/app-shell/workspace-header', () => ({
   WorkspaceHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
 }));

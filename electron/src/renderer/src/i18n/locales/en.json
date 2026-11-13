@@ -640,7 +640,20 @@
     "replace_reference_hint": "Saving replaces this voice's reference sample. Its locked take and own-voice verification are cleared because the new clip may be a different speaker. Leave the transcript blank to transcribe the new clip automatically.",
     "cannotCloneUseDesign": "This model can't clone a voice. Describe one in Voice design, or choose a model that clones.",
     "savedTab": "Saved",
-    "recentsTab": "Recents"
+    "recentsTab": "Recents",
+    "cut_reference": "Cut reference",
+    "cut_reference_hint": "Keep only one passage of this recording. Engines pick their own few seconds from a long clip, so trimming it here is what decides which part of the voice they copy.",
+    "cut_start": "Start",
+    "cut_end": "End",
+    "cut_seconds": "{{seconds}} s",
+    "cut_keeps": "Keeps {{seconds}} s of the recording.",
+    "cut_keep_transcript": "Keep the current transcript",
+    "cut_apply": "Cut clip",
+    "transcribe_missing": "Fill missing transcripts",
+    "transcribe_progress": "Transcribing {{done}}/{{total}}",
+    "transcribe_remaining": " · {{count}} left",
+    "transcribe_already_running": "A transcript run is already in progress.",
+    "transcribe_failed": "Could not start transcribing: {{message}}"
   },
   "recording": {
     "cleaned_loaded": "Recording cleaned and loaded.",

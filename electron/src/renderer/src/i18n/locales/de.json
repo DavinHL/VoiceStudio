@@ -729,7 +729,20 @@
     "replace_reference_hint": "Beim Speichern wird das Referenzbeispiel dieser Stimme ersetzt. Die fixierte Aufnahme und die Bestätigung der eigenen Stimme werden zurückgesetzt, da der neue Clip von einer anderen Person stammen kann. Lass das Transkript leer, um den neuen Clip automatisch zu transkribieren.",
     "cannotCloneUseDesign": "Dieses Modell kann keine Stimme klonen. Beschreibe eine im Stimmdesign oder wähle ein Modell, das klonen kann.",
     "savedTab": "Gespeichert",
-    "recentsTab": "Zuletzt"
+    "recentsTab": "Zuletzt",
+    "cut_reference": "Referenz schneiden",
+    "cut_reference_hint": "Nur einen Abschnitt dieser Aufnahme behalten. Engines wählen ihre eigenen Sekunden aus einem langen Clip, deshalb entscheidet erst dieser Schnitt, welchen Teil der Stimme sie kopieren.",
+    "cut_start": "Anfang",
+    "cut_end": "Ende",
+    "cut_seconds": "{{seconds}} s",
+    "cut_keeps": "Behält {{seconds}} s der Aufnahme.",
+    "cut_keep_transcript": "Aktuelles Transkript behalten",
+    "cut_apply": "Clip schneiden",
+    "transcribe_missing": "Fehlende Transkripte füllen",
+    "transcribe_progress": "Transkribiere {{done}}/{{total}}",
+    "transcribe_remaining": " · {{count}} übrig",
+    "transcribe_already_running": "Ein Transkriptionslauf läuft bereits.",
+    "transcribe_failed": "Transkription konnte nicht gestartet werden: {{message}}"
   },
   "designWorkspace": {
     "title": "Designen",

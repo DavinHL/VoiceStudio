@@ -8,6 +8,7 @@ import { useProfiles } from '@/hooks/use-profiles';
 import { setWorkspace, useWorkspace } from '@/lib/store/workspace';
 import { SavedVoices } from './voices-sidebar';
 import { EditProfile } from './edit-profile';
+import { BulkTranscribeButton } from './bulk-transcribe-button';
 import { runRendererTask } from '@/lib/global-error-recovery';
 
 export function SavedVoicesPage() {
@@ -22,6 +23,7 @@ export function SavedVoicesPage() {
       <WorkspaceHeader>
         <h1 className="text-sm font-medium">{t('clone.saved_profiles')}</h1>
         <div className="flex items-center gap-1">
+          <BulkTranscribeButton />
           <Button
             size="sm"
             variant="ghost"

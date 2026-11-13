@@ -729,7 +729,20 @@
     "replace_reference_hint": "Opslaan vervangt het referentievoorbeeld van deze stem. De vastgezette opname en de verificatie van je eigen stem worden gewist, omdat de nieuwe clip van een andere spreker kan zijn. Laat het transcript leeg om de nieuwe clip automatisch te transcriberen.",
     "cannotCloneUseDesign": "Dit model kan geen stem klonen. Beschrijf er een in Stemontwerp of kies een model dat kan klonen.",
     "savedTab": "Opgeslagen",
-    "recentsTab": "Recent"
+    "recentsTab": "Recent",
+    "cut_reference": "Referentie knippen",
+    "cut_reference_hint": "Bewaar slechts één passage van deze opname. Engines kiezen zelf hun paar seconden uit een lange clip, dus hier knippen bepaalt welk deel van de stem ze kopiëren.",
+    "cut_start": "Begin",
+    "cut_end": "Einde",
+    "cut_seconds": "{{seconds}} s",
+    "cut_keeps": "Bewaart {{seconds}} s van de opname.",
+    "cut_keep_transcript": "Huidige transcript behouden",
+    "cut_apply": "Clip knippen",
+    "transcribe_missing": "Ontbrekende transcripten aanvullen",
+    "transcribe_progress": "Transcriberen {{done}}/{{total}}",
+    "transcribe_remaining": " · {{count}} resterend",
+    "transcribe_already_running": "Er loopt al een transcriptieronde.",
+    "transcribe_failed": "Transcriptie kon niet starten: {{message}}"
   },
   "designWorkspace": {
     "title": "Ontwerpen",

@@ -1,0 +1,25 @@
+Add a reference cut tool and library-wide transcript filling
+
+Cut a saved clone's reference clip down to the passage the voice should
+copy. Engines read only their own best few seconds of a long clip, so a
+reference that contains a chorus or a second speaker clones the wrong
+part of it; trimming the file is what decides what they hear. The cut is
+written beside its target and renamed over it, so a failed cut never
+leaves a half-written clip an engine could load. The new filename is a
+fresh cache key, and the cut clears the locked take and own-voice
+consent exactly as a reference replacement does.
+
+The container cannot be left to ffmpeg's extension sniffing: the staging
+name ends in .part, which has no usable suffix, so the format is named
+explicitly from the target's own extension.
+
+Fill every reference clip that has no transcript in one background run,
+started from Saved voices with per-clip progress and a cancel action.
+Each clip costs a Whisper pass, so the run is sequential and reports
+failures per clip instead of stopping. It calls the ASR directly rather
+than through the forgiving save-time helper, which would report a broken
+decoder as silence. A transcript is written only where it is still
+missing, so text typed during a run is never overwritten.
+
+The run owns its event loop on a worker thread: it outlives the request
+that starts it, and progress is identical under uvicorn or a test client.

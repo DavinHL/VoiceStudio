@@ -729,7 +729,20 @@
     "replace_reference_hint": "Kaydetmek bu sesin referans örneğini değiştirir. Yeni klip farklı bir konuşmacıya ait olabileceğinden kilitli kayıt ve kendi ses doğrulaması temizlenir. Yeni klibin otomatik olarak yazıya dökülmesi için transkripti boş bırakın.",
     "cannotCloneUseDesign": "Bu model ses klonlayamaz. Ses tasarımında bir ses tarif edin veya klonlayan bir model seçin.",
     "savedTab": "Kayıtlı",
-    "recentsTab": "Son"
+    "recentsTab": "Son",
+    "cut_reference": "Referansı kes",
+    "cut_reference_hint": "Bu kaydın yalnızca bir bölümünü saklayın. Motorlar uzun bir klipten kendi saniyelerini seçer, bu nedenle burada kesmek sesin hangi bölümünü kopyalayacaklarını belirler.",
+    "cut_start": "Başlangıç",
+    "cut_end": "Bitiş",
+    "cut_seconds": "{{seconds}} sn",
+    "cut_keeps": "Kaydın {{seconds}} sn'sini saklar.",
+    "cut_keep_transcript": "Geçerli transkripti koru",
+    "cut_apply": "Klibi kes",
+    "transcribe_missing": "Eksik transkriptleri doldur",
+    "transcribe_progress": "Yazıya dökülüyor {{done}}/{{total}}",
+    "transcribe_remaining": " · {{count}} kaldı",
+    "transcribe_already_running": "Zaten sürmekte olan bir transkript işlemi var.",
+    "transcribe_failed": "Yazıya dökme başlatılamadı: {{message}}"
   },
   "designWorkspace": {
     "title": "Tasarla",

@@ -29,6 +29,7 @@ import { cloneSettingsStore, patchCloneSettings } from '@/lib/store/clone-settin
 import { createObjectUrl, revokeObjectUrl } from '@/lib/audio/object-url';
 import { cn } from '@/lib/utils';
 import { ReferenceSourcePicker, ReferenceUsageNote } from './reference-input';
+import { CutReferencePanel } from './cut-reference-panel';
 import { ProfileImageEditor } from './profile-image-editor';
 import { formatRelative } from './format';
 import { useTtsReadiness } from '@/hooks/use-tts-readiness';
@@ -56,6 +57,26 @@ export function EditProfile({ profile, onDone }: { profile: Profile; onDone: () 
     durationSeconds: number | null;
   } | null>(null);
   const [replacementUrl, setReplacementUrl] = useState<string | null>(null);
+  // The stored clip's own length, measured from the audio element: the profile
+  // record carries no duration, and the cut sliders must not guess one.
+  const [referenceDuration, setReferenceDuration] = useState<number | null>(null);
+  const audioSrc = profileAudioUrl(profile.id, profile.audio_url);
+  useEffect(() => {
+    setReferenceDuration(null);
+    if (!profile.ref_audio_path && !profile.locked_audio_path) return;
+    const probe = document.createElement('audio');
+    probe.preload = 'metadata';
+    const settle = (seconds: number) => {
+      if (Number.isFinite(seconds) && seconds > 0) setReferenceDuration(seconds);
+    };
+    const onLoaded = () => settle(probe.duration);
+    probe.addEventListener('loadedmetadata', onLoaded);
+    probe.src = audioSrc;
+    return () => {
+      probe.removeEventListener('loadedmetadata', onLoaded);
+      probe.src = '';
+    };
+  }, [audioSrc, profile.ref_audio_path, profile.locked_audio_path]);
   useEffect(() => {
     if (!replacement) {
       setReplacementUrl(null);
@@ -232,6 +253,13 @@ export function EditProfile({ profile, onDone }: { profile: Profile; onDone: () 
             <div className="flex flex-col gap-2">
               <ReferenceSourcePicker onAccept={acceptReplacement} />
             </div>
+          )}
+          {!replacement && !choosing && canReplace && (
+            <CutReferencePanel
+              profile={profile}
+              durationSeconds={referenceDuration}
+              disabled={unavailable}
+            />
           )}
           {(replacement || choosing) && (
             <p role="note" className="text-xs text-muted-foreground">

@@ -739,7 +739,20 @@
     "replace_reference_hint": "Zapisanie zastępuje próbkę referencyjną tego głosu. Zablokowane nagranie i weryfikacja własnego głosu zostaną wyczyszczone, ponieważ nowy klip może należeć do innej osoby. Zostaw transkrypcję pustą, aby nowy klip został przepisany automatycznie.",
     "cannotCloneUseDesign": "Ten model nie potrafi klonować głosu. Opisz głos w Projektowaniu głosu lub wybierz model, który klonuje.",
     "savedTab": "Zapisane",
-    "recentsTab": "Ostatnie"
+    "recentsTab": "Ostatnie",
+    "cut_reference": "Przytnij referencję",
+    "cut_reference_hint": "Zachowaj tylko jeden fragment tego nagrania. Silniki same wybierają swoje kilka sekund z długiego klipu, więc przycięcie tutaj decyduje, którą część głosu skopiują.",
+    "cut_start": "Początek",
+    "cut_end": "Koniec",
+    "cut_seconds": "{{seconds}} s",
+    "cut_keeps": "Zachowuje {{seconds}} s nagrania.",
+    "cut_keep_transcript": "Zachowaj bieżący transkrypt",
+    "cut_apply": "Przytnij klip",
+    "transcribe_missing": "Uzupełnij brakujące transkrypty",
+    "transcribe_progress": "Transkrypcja {{done}}/{{total}}",
+    "transcribe_remaining": " · zostało {{count}}",
+    "transcribe_already_running": "Transkrypcja już trwa.",
+    "transcribe_failed": "Nie udało się rozpocząć transkrypcji: {{message}}"
   },
   "designWorkspace": {
     "title": "Projektuj",

@@ -85,3 +85,65 @@ export async function replaceProfileAudio(
 export async function deleteProfile(id: string): Promise<void> {
   await apiFetch(`/profiles/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
+
+/**
+ * Permanently cut a clone's reference clip down to one window (#3925).
+ *
+ * A cut is what fixes a clone that copies the wrong passage: engines read only
+ * their own best few seconds of a long clip, so trimming the file is the only
+ * way to choose what they hear.
+ */
+export async function trimProfileAudio(
+  id: string,
+  input: { startS: number; endS: number; keepTranscript?: boolean },
+): Promise<Profile> {
+  return apiJson<Profile>(`/profiles/${encodeURIComponent(id)}/audio/trim`, {
+    method: 'POST',
+    body: JSON.stringify({
+      start_s: input.startS,
+      end_s: input.endS,
+      keep_transcript: Boolean(input.keepTranscript),
+    }),
+  });
+}
+
+export interface BulkTranscribeProfile {
+  id: string;
+  name: string;
+  status: 'pending' | 'running' | 'done' | 'skipped' | 'failed' | 'cancelled';
+  ref_text: string;
+  error: string | null;
+}
+
+export interface BulkTranscribeStatus {
+  status: 'idle' | 'running' | 'done' | 'cancelled';
+  total: number;
+  done: number;
+  skipped: number;
+  failed: number;
+  profiles: BulkTranscribeProfile[];
+}
+
+/** Start filling a transcript for every reference clip that has none or few. */
+export async function startBulkTranscribe(
+  includeTranscribed = false,
+): Promise<BulkTranscribeStatus & { started: boolean }> {
+  return apiJson<BulkTranscribeStatus & { started: boolean }>('/profiles/transcripts/auto', {
+    method: 'POST',
+    body: JSON.stringify({ include_transcribed: includeTranscribed }),
+  });
+}
+
+export async function bulkTranscribeStatus({
+  signal,
+}: { signal?: AbortSignal } = {}): Promise<BulkTranscribeStatus> {
+  return apiJson<BulkTranscribeStatus>('/profiles/transcripts/auto', { signal });
+}
+
+export async function cancelBulkTranscribe(): Promise<
+  BulkTranscribeStatus & { cancelled: boolean }
+> {
+  return apiJson<BulkTranscribeStatus & { cancelled: boolean }>('/profiles/transcripts/auto', {
+    method: 'DELETE',
+  });
+}
