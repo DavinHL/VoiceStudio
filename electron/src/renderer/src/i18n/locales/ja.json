@@ -641,6 +641,7 @@
     "dialect_qingdao": "青島方言",
     "dialect_dongbei": "東北方言",
     "style_placeholder": "例:ささやき声",
+    "style_tags_hint": "この声を表す属性を選びます。{{engine}} が受け付けるのはこれだけで、各グループ1つまで — 話し方は参照クリップが決めます。",
     "stop_playback": "再生を停止",
     "describe_label": "声を言葉で説明",
     "describe_placeholder": "例: a warm elderly British storyteller, slightly raspy",
@@ -3761,6 +3762,7 @@
     "balance": "構造と細部のバランス",
     "denoise": "参照音声のノイズ除去",
     "polish": "生成音声の仕上げ",
+    "preprocess_ref": "参照クリップを整える",
     "basics": "1×が通常速度です。自然な長さにするには時間を空欄にします。",
     "hint": "通常は既定値のままで構いません。ガイダンスはプロンプトの影響を、その他の設定はモデルの音の組み立て方を調整します。一度に一つずつ変更してください。"
   },

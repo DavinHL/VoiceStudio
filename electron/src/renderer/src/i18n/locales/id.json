@@ -641,6 +641,7 @@
     "dialect_qingdao": "Dialek Qingdao",
     "dialect_dongbei": "Dialek Timur Laut",
     "style_placeholder": "misalnya berbisik",
+    "style_tags_hint": "Pilih atribut yang menggambarkan suara ini. {{engine}} hanya menerima ini, satu per grup — penyampaiannya tetap ditentukan klip referensi.",
     "stop_playback": "Hentikan pemutaran",
     "describe_label": "Deskripsikan suara Anda",
     "describe_placeholder": "mis. a warm elderly British storyteller, slightly raspy",
@@ -3761,6 +3762,7 @@
     "balance": "Keseimbangan kasar ke halus",
     "denoise": "Bersihkan derau referensi",
     "polish": "Sempurnakan audio yang dihasilkan",
+    "preprocess_ref": "Bersihkan klip referensi",
     "basics": "1× adalah kecepatan normal. Kosongkan durasi untuk irama alami.",
     "hint": "Biasanya biarkan nilai bawaan. Panduan mengatur pengaruh instruksi; kontrol lain mengubah cara model membentuk suara. Ubah satu per satu."
   },

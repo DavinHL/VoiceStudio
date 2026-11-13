@@ -643,6 +643,7 @@
     "dialect_qingdao": "Dialecte du Qingdao",
     "dialect_dongbei": "Dialecte du Nord-Est",
     "style_placeholder": "par ex. murmurer",
+    "style_tags_hint": "Choisissez les attributs qui décrivent cette voix. {{engine}} n'accepte que ceux-ci, un par groupe — c'est le clip de référence qui définit toujours l'interprétation.",
     "stop_playback": "Arrêter la lecture",
     "describe_label": "Décrivez votre voix",
     "describe_placeholder": "p. ex. a warm elderly British storyteller, slightly raspy",
@@ -3763,6 +3764,7 @@
     "balance": "Équilibre du grossier au fin",
     "denoise": "Nettoyer le bruit de référence",
     "polish": "Peaufiner l’audio généré",
+    "preprocess_ref": "Nettoyer le clip de référence",
     "basics": "1× est la vitesse normale. Laissez la durée vide pour un rythme naturel.",
     "hint": "Gardez généralement les valeurs par défaut. Le guidage règle l’influence de la consigne ; les autres réglages modifient la construction du son. Changez un seul réglage à la fois."
   },

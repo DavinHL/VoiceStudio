@@ -641,6 +641,7 @@
     "dialect_qingdao": "Qingdao-dialekt",
     "dialect_dongbei": "Nordostkinesisk dialekt",
     "style_placeholder": "t.ex. viska",
+    "style_tags_hint": "Välj de egenskaper som beskriver denna röst. {{engine}} tar bara emot dessa, en per grupp — framförandet sätts fortfarande av referensklippet.",
     "stop_playback": "Stoppa uppspelning",
     "describe_label": "Beskriv din röst",
     "describe_placeholder": "t.ex. a warm elderly British storyteller, slightly raspy",
@@ -3761,6 +3762,7 @@
     "balance": "Balans mellan grovt och fint",
     "denoise": "Ta bort brus från referensen",
     "polish": "Förfina genererat ljud",
+    "preprocess_ref": "Rensa referensklippet",
     "basics": "1× är normal hastighet. Lämna längden tom för naturlig timing.",
     "hint": "Behåll vanligtvis standardvärdena. Vägledning styr instruktionens påverkan; övriga reglage ändrar hur modellen bygger ljudet. Ändra ett i taget."
   },

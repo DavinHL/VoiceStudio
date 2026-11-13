@@ -643,6 +643,7 @@
     "dialect_qingdao": "Dialetto di Qingdao",
     "dialect_dongbei": "Dialetto del nord-est",
     "style_placeholder": "ad es. sussurrare",
+    "style_tags_hint": "Scegli gli attributi che descrivono questa voce. {{engine}} accetta solo questi, uno per gruppo — l'esecuzione resta definita dal clip di riferimento.",
     "stop_playback": "Interrompi riproduzione",
     "describe_label": "Descrivi la tua voce",
     "describe_placeholder": "es. a warm elderly British storyteller, slightly raspy",
@@ -3763,6 +3764,7 @@
     "balance": "Equilibrio tra struttura e dettaglio",
     "denoise": "Rimuovi rumore dal riferimento",
     "polish": "Rifinisci l’audio generato",
+    "preprocess_ref": "Pulisci il clip di riferimento",
     "basics": "1× è la velocità normale. Lascia vuota la durata per un ritmo naturale.",
     "hint": "Di solito vanno bene i valori predefiniti. La guida regola l’influenza del prompt; gli altri controlli cambiano come il modello costruisce il suono. Modificane uno alla volta."
   },

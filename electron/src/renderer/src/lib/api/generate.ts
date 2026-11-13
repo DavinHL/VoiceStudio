@@ -166,6 +166,7 @@ export function toGenerateForm(input: CloneGenerateInput): FormData {
   form.append('class_temperature', String(input.classTemp));
   form.append('layer_penalty_factor', String(input.layerPenalty));
   form.append('postprocess_output', String(input.postprocess));
+  form.append('preprocess_prompt', String(input.preprocessRef));
   const duration = Number.parseFloat(input.duration);
   if (input.duration && Number.isFinite(duration)) form.append('duration', String(duration));
 

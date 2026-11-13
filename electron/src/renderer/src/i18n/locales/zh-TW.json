@@ -641,6 +641,7 @@
     "dialect_qingdao": "青島話",
     "dialect_dongbei": "東北話",
     "style_placeholder": "例如耳語",
+    "style_tags_hint": "選擇描述這個聲音的屬性。{{engine}} 只接受這些，每組一個——表現力仍由參考音訊決定。",
     "stop_playback": "停止播放",
     "describe_label": "描述你想要的聲音",
     "describe_placeholder": "例如：a warm elderly British storyteller, slightly raspy",
@@ -3761,6 +3762,7 @@
     "balance": "結構與細節平衡",
     "denoise": "清除參考音訊雜訊",
     "polish": "潤飾生成音訊",
+    "preprocess_ref": "清理參考音訊",
     "basics": "1× 為正常語速。時長留空可使用自然節奏。",
     "hint": "通常建議保留預設值。引導強度控制提示詞的影響，其他選項改變模型建構聲音的方式。每次只調整一項。"
   },

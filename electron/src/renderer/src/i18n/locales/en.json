@@ -479,6 +479,7 @@
     "transcript_hint": "What the reference clip says. Leave empty to let the engine listen.",
     "style": "Style",
     "style_placeholder": "e.g. whisper",
+    "style_tags_hint": "Pick the attributes that describe this voice. {{engine}} accepts only these, and one per group — the reference clip still sets the delivery.",
     "optional": "(Optional)",
     "save_as_profile": "Save as voice profile",
     "profile_name": "Profile name",
@@ -3761,6 +3762,7 @@
     "balance": "Coarse-to-fine balance",
     "denoise": "Clean reference noise",
     "polish": "Polish generated audio",
+    "preprocess_ref": "Clean the reference clip",
     "basics": "1× is normal speed. Leave duration blank for natural timing.",
     "hint": "Usually leave these at defaults. Guidance adjusts prompt influence; the other controls change how the model builds the sound. Change one at a time."
   },

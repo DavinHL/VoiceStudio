@@ -641,6 +641,7 @@
     "dialect_qingdao": "Phương ngữ Thanh Đảo",
     "dialect_dongbei": "Phương ngữ Đông Bắc",
     "style_placeholder": "ví dụ: thì thầm",
+    "style_tags_hint": "Chọn các thuộc tính mô tả giọng này. {{engine}} chỉ chấp nhận những thuộc tính này, mỗi nhóm một — cách thể hiện vẫn do đoạn tham chiếu quyết định.",
     "stop_playback": "Dừng phát",
     "describe_label": "Mô tả giọng nói của bạn",
     "describe_placeholder": "vd. a warm elderly British storyteller, slightly raspy",
@@ -3761,6 +3762,7 @@
     "balance": "Cân bằng cấu trúc và chi tiết",
     "denoise": "Lọc nhiễu bản tham chiếu",
     "polish": "Trau chuốt âm thanh đã tạo",
+    "preprocess_ref": "Làm sạch đoạn tham chiếu",
     "basics": "1× là tốc độ bình thường. Để trống thời lượng để có nhịp tự nhiên.",
     "hint": "Thường nên giữ giá trị mặc định. Độ dẫn hướng điều chỉnh ảnh hưởng của lời nhắc; các nút khác thay đổi cách mô hình tạo âm thanh. Mỗi lần chỉ đổi một mục."
   },

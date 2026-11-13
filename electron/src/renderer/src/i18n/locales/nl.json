@@ -641,6 +641,7 @@
     "dialect_qingdao": "Qingdao-dialect",
     "dialect_dongbei": "Noordoost-Chinees dialect",
     "style_placeholder": "bijv. fluisteren",
+    "style_tags_hint": "Kies de kenmerken die deze stem beschrijven. {{engine}} accepteert alleen deze, één per groep — de voordracht komt nog steeds uit de referentieclip.",
     "stop_playback": "Afspelen stoppen",
     "describe_label": "Beschrijf je stem",
     "describe_placeholder": "bijv. a warm elderly British storyteller, slightly raspy",
@@ -3761,6 +3762,7 @@
     "balance": "Balans tussen grof en fijn",
     "denoise": "Ruis uit referentie verwijderen",
     "polish": "Gegenereerde audio verfijnen",
+    "preprocess_ref": "Referentieclip opschonen",
     "basics": "1× is normale snelheid. Laat de duur leeg voor een natuurlijk ritme.",
     "hint": "Gebruik doorgaans de standaardwaarden. Sturing bepaalt de invloed van de instructie; de andere instellingen veranderen hoe het model geluid opbouwt. Wijzig één instelling tegelijk."
   },

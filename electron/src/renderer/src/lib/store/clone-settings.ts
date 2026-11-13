@@ -42,6 +42,12 @@ export interface CloneSettings {
   layerPenalty: number;
   denoise: boolean;
   postprocess: boolean;
+  /**
+   * Clean the reference clip before it is encoded: trims long silences and
+   * punctuates the transcript. Off feeds the clip as recorded, which is how a
+   * breath inside a pause survives into the clone.
+   */
+  preprocessRef: boolean;
   /** '' = auto. */
   duration: string;
   showOverrides: boolean;
@@ -72,6 +78,7 @@ export const DEFAULT_CLONE_SETTINGS: CloneSettings = {
   layerPenalty: 5.0,
   denoise: true,
   postprocess: true,
+  preprocessRef: true,
   duration: '',
   showOverrides: false,
   selectedProfileId: null,
@@ -227,8 +234,18 @@ export function resetVoiceControls(): void {
 
 /** Reset the production overrides (steps, cfg, …, duration) to their defaults. */
 export function resetOverrides(): void {
-  const { steps, cfg, speed, tShift, posTemp, classTemp, layerPenalty, denoise, postprocess } =
-    DEFAULT_CLONE_SETTINGS;
+  const {
+    steps,
+    cfg,
+    speed,
+    tShift,
+    posTemp,
+    classTemp,
+    layerPenalty,
+    denoise,
+    postprocess,
+    preprocessRef,
+  } = DEFAULT_CLONE_SETTINGS;
   patchCloneSettings({
     wavBits: DEFAULT_CLONE_SETTINGS.wavBits,
     effectPreset: DEFAULT_CLONE_SETTINGS.effectPreset,
@@ -241,6 +258,7 @@ export function resetOverrides(): void {
     layerPenalty,
     denoise,
     postprocess,
+    preprocessRef,
     duration: DEFAULT_CLONE_SETTINGS.duration,
     seed: DEFAULT_CLONE_SETTINGS.seed,
     emotionMode: DEFAULT_CLONE_SETTINGS.emotionMode,

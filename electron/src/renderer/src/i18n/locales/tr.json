@@ -641,6 +641,7 @@
     "dialect_qingdao": "Qingdao lehçesi",
     "dialect_dongbei": "Kuzeydoğu lehçesi",
     "style_placeholder": "örneğin fısıltı",
+    "style_tags_hint": "Bu sesi tanımlayan öznitelikleri seçin. {{engine}} yalnızca bunları kabul eder, grup başına bir tane — sunuşu yine referans klip belirler.",
     "stop_playback": "Oynatmayı durdur",
     "describe_label": "Sesinizi tarif edin",
     "describe_placeholder": "örn. a warm elderly British storyteller, slightly raspy",
@@ -3761,6 +3762,7 @@
     "balance": "Kaba-ince denge",
     "denoise": "Referans gürültüsünü temizle",
     "polish": "Üretilen sesi iyileştir",
+    "preprocess_ref": "Referans klibini temizle",
     "basics": "1× normal hızdır. Doğal zamanlama için süreyi boş bırakın.",
     "hint": "Genellikle varsayılanları koruyun. Yönlendirme istemin etkisini ayarlar; diğer kontroller modelin sesi oluşturma şeklini değiştirir. Her seferinde birini değiştirin."
   },

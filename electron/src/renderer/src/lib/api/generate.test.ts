@@ -29,6 +29,7 @@ const BASE_INPUT: CloneGenerateInput = {
   layerPenalty: 5,
   denoise: true,
   postprocess: true,
+  preprocessRef: true,
   duration: '',
 };
 
@@ -150,6 +151,16 @@ describe('toGenerateForm', () => {
     expect(form.get('postprocess_output')).toBe('true');
     expect(form.has('duration')).toBe(false);
     expect(form.has('instruct')).toBe(false);
+  });
+
+  it('sends the reference cleanup choice the encoder reads (#3923)', () => {
+    expect(toGenerateForm({ ...BASE_INPUT, profileId: 'p1' }).get('preprocess_prompt')).toBe('true');
+    // Off is a real choice: the clip reaches the encoder as recorded.
+    expect(
+      toGenerateForm({ ...BASE_INPUT, profileId: 'p1', preprocessRef: false }).get(
+        'preprocess_prompt',
+      ),
+    ).toBe('false');
   });
 
   it('sends the language when it is not Auto and a truthy duration', () => {

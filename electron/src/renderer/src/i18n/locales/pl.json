@@ -651,6 +651,7 @@
     "dialect_qingdao": "Dialekt Qingdao",
     "dialect_dongbei": "Dialekt północno-wschodni",
     "style_placeholder": "np. szeptać",
+    "style_tags_hint": "Wybierz cechy opisujące ten głos. {{engine}} przyjmuje tylko je, po jednej z grupy — sposób mówienia nadal określa klip referencyjny.",
     "stop_playback": "Zatrzymaj odtwarzanie",
     "describe_label": "Opisz swój głos",
     "describe_placeholder": "np. a warm elderly British storyteller, slightly raspy",
@@ -3787,6 +3788,7 @@
     "balance": "Równowaga między strukturą a detalami",
     "denoise": "Usuń szum z nagrania wzorcowego",
     "polish": "Dopracuj wygenerowany dźwięk",
+    "preprocess_ref": "Oczyść klip referencyjny",
     "basics": "1× to normalna prędkość. Pozostaw czas pusty, aby zachować naturalne tempo.",
     "hint": "Zwykle najlepiej pozostawić wartości domyślne. Sterowanie określa wpływ polecenia; pozostałe ustawienia zmieniają sposób budowania dźwięku. Zmieniaj jedno naraz."
   },

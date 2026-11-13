@@ -479,6 +479,7 @@
     "transcript_hint": "O que di o clip de referencia. Déixao baleiro para que o motor escoite.",
     "style": "Estilo",
     "style_placeholder": "p.ex. murmurar",
+    "style_tags_hint": "Escolle os atributos que describen esta voz. {{engine}} só acepta estes, un por grupo — o clip de referencia segue definindo a interpretación.",
     "optional": "(Opcional)",
     "save_as_profile": "Gardar como perfil de voz",
     "profile_name": "Nome do perfil",
@@ -3761,6 +3762,7 @@
     "balance": "Equilibrio de groso a fino",
     "denoise": "Ruído de referencia limpo",
     "polish": "Audio xerado polaco",
+    "preprocess_ref": "Limpar o clip de referencia",
     "basics": "1× é a velocidade normal. Deixa a duración en branco para o tempo natural.",
     "hint": "Normalmente deixa estes predeterminado. A orientación axusta a influencia inmediata; os outros controis cambian como o modelo constrúe o son. Cambia un a un."
   },

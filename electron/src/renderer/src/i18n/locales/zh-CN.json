@@ -739,6 +739,7 @@
     "saved_profiles": "已保存的声音",
     "select_profile": "使用此声音",
     "style_placeholder": "例如：耳语",
+    "style_tags_hint": "选择描述这个声音的属性。{{engine}} 只接受这些，每组一个——表现力仍由参考音频决定。",
     "synthesize": "合成音频",
     "toggle_sidebar": "切换侧边栏",
     "transcript": "转写文本",
@@ -3757,6 +3758,7 @@
     "balance": "结构与细节平衡",
     "denoise": "清除参考音频噪声",
     "polish": "润色生成音频",
+    "preprocess_ref": "清理参考音频",
     "basics": "1× 为正常语速。时长留空可使用自然节奏。",
     "hint": "通常建议保留默认值。引导强度控制提示词的影响，其他选项改变模型构建声音的方式。每次只调整一项。"
   },

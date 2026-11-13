@@ -23,6 +23,7 @@ import {
   SparklesIcon,
   ThermometerIcon,
   TimerIcon,
+  Wand2Icon,
   XIcon,
   type LucideIcon,
 } from 'lucide-react';
@@ -170,7 +171,7 @@ function SliderRow({ spec, value }: SliderRowProps) {
 }
 
 interface SwitchRowProps {
-  settingKey: 'denoise' | 'postprocess';
+  settingKey: 'denoise' | 'postprocess' | 'preprocessRef';
   labelKey: string;
   icon: LucideIcon;
   checked: boolean;
@@ -281,6 +282,12 @@ function Overrides({ settings }: OverridesProps) {
           labelKey="voiceControls.polish"
           icon={SparklesIcon}
           checked={settings.postprocess}
+        />
+        <SwitchRow
+          settingKey="preprocessRef"
+          labelKey="voiceControls.preprocess_ref"
+          icon={Wand2Icon}
+          checked={settings.preprocessRef}
         />
       </div>
       <details className="group border-t border-border/50 pt-2.5">

@@ -636,6 +636,7 @@
     "dialect_qingdao": "칭다오 방언",
     "dialect_dongbei": "둥베이 방언",
     "style_placeholder": "예를 들어 속삭임",
+    "style_tags_hint": "이 목소리를 설명하는 속성을 고르세요. {{engine}}는 이것만 받아들이며 그룹당 하나입니다 — 전달 방식은 참조 클립이 정합니다.",
     "describe_label": "목소리를 설명하세요",
     "describe_placeholder": "예: a warm elderly British storyteller, slightly raspy",
     "describe_hint": "목소리를 설명하거나 시작점을 선택하세요. 둘 중 무엇을 해도 아래 세부 정보가 채워집니다.",
@@ -3761,6 +3762,7 @@
     "balance": "구조와 세부 균형",
     "denoise": "참조 음성 잡음 제거",
     "polish": "생성된 오디오 다듬기",
+    "preprocess_ref": "참조 클립 정리",
     "basics": "1×는 일반 속도입니다. 자연스러운 길이를 원하면 시간을 비워 두세요.",
     "hint": "보통 기본값을 유지하세요. 가이던스는 프롬프트의 영향을 조정하고, 다른 설정은 모델이 소리를 구성하는 방식을 바꿉니다. 한 번에 하나씩 변경하세요."
   },

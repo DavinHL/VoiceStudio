@@ -641,6 +641,7 @@
     "dialect_qingdao": "Qingdao-Dialekt",
     "dialect_dongbei": "Nordostchinesischer Dialekt",
     "style_placeholder": "z.B. flüstern",
+    "style_tags_hint": "Wähle die Merkmale, die diese Stimme beschreiben. {{engine}} akzeptiert nur diese, eines pro Gruppe — die Vortragsweise kommt weiterhin aus dem Referenzclip.",
     "stop_playback": "Wiedergabe stoppen",
     "describe_label": "Beschreibe deine Stimme",
     "describe_placeholder": "z. B. a warm elderly British storyteller, slightly raspy",
@@ -3761,6 +3762,7 @@
     "balance": "Balance zwischen grob und fein",
     "denoise": "Rauschen der Referenz entfernen",
     "polish": "Erzeugtes Audio verfeinern",
+    "preprocess_ref": "Referenzclip aufbereiten",
     "basics": "1× ist normale Geschwindigkeit. Für natürliches Timing die Dauer leer lassen.",
     "hint": "Meist sind die Standardwerte passend. Die Vorgabe beeinflusst das Ergebnis; die anderen Regler ändern den Klangaufbau des Modells. Jeweils nur einen ändern."
   },

@@ -1379,7 +1379,7 @@ def _run_backend_inference(
     max_chunk_chars=None, crossfade_ms=None, *, t_shift=None,
     layer_penalty_factor=None, position_temperature=None,
     class_temperature=None, dropped_sink=None, preset_voice=None,
-    emotion_kwargs=None,
+    emotion_kwargs=None, preprocess_prompt=None,
 ):
     """Engine-aware twin of :func:`_run_inference` (issue #312).
 
@@ -1402,6 +1402,8 @@ def _run_backend_inference(
             instruct=instruct, num_step=num_step, guidance_scale=guidance_scale,
             speed=speed, denoise=denoise, postprocess_output=postprocess_output,
         )
+        if preprocess_prompt is not None:
+            gen_kwargs["preprocess_prompt"] = preprocess_prompt
         if preset_voice:
             gen_kwargs["voice"] = preset_voice
         if emotion_kwargs and getattr(backend, "supports_emotion", False):
@@ -1893,6 +1895,11 @@ async def generate_speech(
     t_shift: Optional[float] = Form(None),
     denoise: bool = Form(True),
     postprocess_output: Optional[bool] = Form(None),
+    # #3923: the desktop Clone page exposes this. Turning it off feeds the
+    # reference clip to the encoder untouched, which is what keeps a breath or
+    # a pause the trimmer would have removed, and what lets several takes share
+    # one encoded prompt when the trim would otherwise differ per take.
+    preprocess_prompt: Optional[bool] = Form(None),
     layer_penalty_factor: Optional[float] = Form(None),
     position_temperature: Optional[float] = Form(None),
     class_temperature: Optional[float] = Form(None),
@@ -2510,6 +2517,7 @@ async def generate_speech(
                                     dropped_sink=_dropped_sink,
                                     preset_voice=preset_voice,
                                     emotion_kwargs=emotion_kwargs,
+                                    preprocess_prompt=preprocess_prompt,
                                 ),
                                 what="TTS generate",
                                 min_vram_gb=_engine_min_vram_gb,
@@ -2746,6 +2754,7 @@ async def generate_speech(
                 dropped_sink=_dropped_text,
                 preset_voice=preset_voice,
                 emotion_kwargs=emotion_kwargs,
+                preprocess_prompt=preprocess_prompt,
             )
         else:
             _local_render = functools.partial(

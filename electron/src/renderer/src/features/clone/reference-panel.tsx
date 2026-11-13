@@ -28,6 +28,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useProfiles, useCreateCloneProfile } from '@/hooks/use-profiles';
+import { useEngines } from '@/hooks/use-engines';
+import { StyleField, StylePicker, usesTagVocabulary } from './style-picker';
 import { setCloneSetting, useCloneSetting } from '@/lib/store/clone-settings';
 import { selectCloneProfile, setReferenceFile, useReference } from '@/lib/store/reference';
 import { setWorkspace } from '@/lib/store/workspace';
@@ -241,6 +243,8 @@ export function OptionalDetails({
   transcription?: ReturnType<typeof useReferenceTranscript>;
 }) {
   const { t } = useTranslation();
+  const { activeTts } = useEngines();
+  const tagStyle = usesTagVocabulary(activeTts);
   const refText = useCloneSetting('refText');
   const instruct = useCloneSetting('instruct');
   const [open, setOpen] = useState(() => Boolean(refText || instruct));
@@ -331,17 +335,23 @@ export function OptionalDetails({
               </Button>
             )}
           </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor={styleId} className="text-[length:var(--text-label)]">
-              {t('clone.style')}
-            </Label>
-            <Input
+          {tagStyle ? (
+            <div className="flex min-w-0 flex-col gap-1.5 @min-[420px]:col-span-2">
+              <Label className="text-[length:var(--text-label)]">{t('clone.style')}</Label>
+              <StylePicker
+                engine={activeTts}
+                value={instruct}
+                onChange={(next) => setCloneSetting('instruct', next)}
+              />
+            </div>
+          ) : (
+            <StyleField
               id={styleId}
               value={instruct}
-              onChange={(event) => setCloneSetting('instruct', event.target.value)}
+              onChange={(next) => setCloneSetting('instruct', next)}
               placeholder={t('clone.style_placeholder')}
             />
-          </div>
+          )}
         </div>
       </CollapsibleContent>
     </Collapsible>

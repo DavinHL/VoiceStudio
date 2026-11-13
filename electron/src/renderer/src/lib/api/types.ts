@@ -203,6 +203,8 @@ export interface CloneGenerateInput {
   layerPenalty: number;
   denoise: boolean;
   postprocess: boolean;
+  /** Clean the reference clip before encoding it (trim silence, punctuate the transcript). */
+  preprocessRef: boolean;
   /** '' = auto. */
   duration: string;
 }

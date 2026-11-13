@@ -16,6 +16,7 @@ vi.mock('@/hooks/use-profiles', () => ({
   useProfiles: () => ({ data: [] }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('@/hooks/use-engines', () => ({ useEngines: () => ({ activeTts: null }) }));
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: ReactNode }) => <a href="#models">{children}</a>,
 }));
