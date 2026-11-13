@@ -653,7 +653,9 @@
     "transcribe_progress": "Transcribindo {{done}}/{{total}}",
     "transcribe_remaining": " · quedan {{count}}",
     "transcribe_already_running": "Xa hai unha transcrición en curso.",
-    "transcribe_failed": "Non se puido iniciar a transcrición: {{message}}"
+    "transcribe_failed": "Non se puido iniciar a transcrición: {{message}}",
+    "transcribe_this": "Transcribir este audio",
+    "transcribe_needs_reference": "Esta voz non ten audio de referencia que transcribir."
   },
   "recording": {
     "cleaned_loaded": "Gravación limpa e cargada.",

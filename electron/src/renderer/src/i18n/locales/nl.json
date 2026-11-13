@@ -742,7 +742,9 @@
     "transcribe_progress": "Transcriberen {{done}}/{{total}}",
     "transcribe_remaining": " · {{count}} resterend",
     "transcribe_already_running": "Er loopt al een transcriptieronde.",
-    "transcribe_failed": "Transcriptie kon niet starten: {{message}}"
+    "transcribe_failed": "Transcriptie kon niet starten: {{message}}",
+    "transcribe_this": "Deze opname transcriberen",
+    "transcribe_needs_reference": "Deze stem heeft geen referentieopname om te transcriberen."
   },
   "designWorkspace": {
     "title": "Ontwerpen",

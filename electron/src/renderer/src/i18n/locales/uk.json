@@ -752,7 +752,9 @@
     "transcribe_progress": "Транскрибування {{done}}/{{total}}",
     "transcribe_remaining": " · залишилося {{count}}",
     "transcribe_already_running": "Транскрибування вже виконується.",
-    "transcribe_failed": "Не вдалося почати транскрибування: {{message}}"
+    "transcribe_failed": "Не вдалося почати транскрибування: {{message}}",
+    "transcribe_this": "Розпізнати цей фрагмент",
+    "transcribe_needs_reference": "У цього голосу немає референсного фрагмента для розпізнавання."
   },
   "designWorkspace": {
     "title": "Створити",

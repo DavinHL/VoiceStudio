@@ -742,7 +742,9 @@
     "transcribe_progress": "กำลังถอดเสียง {{done}}/{{total}}",
     "transcribe_remaining": " · เหลือ {{count}}",
     "transcribe_already_running": "กำลังถอดเสียงอยู่แล้ว",
-    "transcribe_failed": "เริ่มถอดเสียงไม่สำเร็จ: {{message}}"
+    "transcribe_failed": "เริ่มถอดเสียงไม่สำเร็จ: {{message}}",
+    "transcribe_this": "ถอดข้อความคลิปนี้",
+    "transcribe_needs_reference": "เสียงนี้ไม่มีคลิปอ้างอิงให้ถอดข้อความ"
   },
   "designWorkspace": {
     "title": "สร้างเสียง",

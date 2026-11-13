@@ -762,7 +762,9 @@
     "transcribe_progress": "جارٍ نسخ {{done}}/{{total}}",
     "transcribe_remaining": " · يتبقى {{count}}",
     "transcribe_already_running": "هناك عملية نسخ قيد التنفيذ بالفعل.",
-    "transcribe_failed": "تعذر بدء النسخ: {{message}}"
+    "transcribe_failed": "تعذر بدء النسخ: {{message}}",
+    "transcribe_this": "انسخ هذا المقطع",
+    "transcribe_needs_reference": "لا يوجد مقطع مرجعي لنسخه."
   },
   "designWorkspace": {
     "title": "تصميم",

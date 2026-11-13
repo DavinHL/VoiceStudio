@@ -742,7 +742,9 @@
     "transcribe_progress": "Đang chép lời {{done}}/{{total}}",
     "transcribe_remaining": " · còn {{count}}",
     "transcribe_already_running": "Đang có một lượt chép lời chạy.",
-    "transcribe_failed": "Không thể bắt đầu chép lời: {{message}}"
+    "transcribe_failed": "Không thể bắt đầu chép lời: {{message}}",
+    "transcribe_this": "Chép lời đoạn này",
+    "transcribe_needs_reference": "Giọng này không có đoạn tham chiếu để chép lời."
   },
   "designWorkspace": {
     "title": "Thiết kế",

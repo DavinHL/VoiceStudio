@@ -742,7 +742,9 @@
     "transcribe_progress": "전사 중 {{done}}/{{total}}",
     "transcribe_remaining": " · {{count}}개 남음",
     "transcribe_already_running": "이미 전사가 진행 중입니다.",
-    "transcribe_failed": "전사를 시작할 수 없습니다: {{message}}"
+    "transcribe_failed": "전사를 시작할 수 없습니다: {{message}}",
+    "transcribe_this": "이 클립 전사",
+    "transcribe_needs_reference": "이 목소리에는 전사할 참조 클립이 없습니다."
   },
   "designWorkspace": {
     "title": "디자인",

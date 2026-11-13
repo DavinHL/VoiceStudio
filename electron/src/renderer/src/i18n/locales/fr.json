@@ -744,7 +744,9 @@
     "transcribe_progress": "Transcription {{done}}/{{total}}",
     "transcribe_remaining": " · {{count}} restantes",
     "transcribe_already_running": "Une transcription est déjà en cours.",
-    "transcribe_failed": "Impossible de démarrer la transcription : {{message}}"
+    "transcribe_failed": "Impossible de démarrer la transcription : {{message}}",
+    "transcribe_this": "Transcrire cet extrait",
+    "transcribe_needs_reference": "Cette voix n'a pas d'extrait de référence à transcrire."
   },
   "designWorkspace": {
     "title": "Concevoir",

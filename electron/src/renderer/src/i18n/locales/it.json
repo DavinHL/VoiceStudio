@@ -744,7 +744,9 @@
     "transcribe_progress": "Trascrizione {{done}}/{{total}}",
     "transcribe_remaining": " · {{count}} rimasti",
     "transcribe_already_running": "Una trascrizione è già in corso.",
-    "transcribe_failed": "Impossibile avviare la trascrizione: {{message}}"
+    "transcribe_failed": "Impossibile avviare la trascrizione: {{message}}",
+    "transcribe_this": "Trascrivi questo audio",
+    "transcribe_needs_reference": "Questa voce non ha un audio di riferimento da trascrivere."
   },
   "designWorkspace": {
     "title": "Progetta",

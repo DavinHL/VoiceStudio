@@ -653,7 +653,9 @@
     "transcribe_progress": "Transcribing {{done}}/{{total}}",
     "transcribe_remaining": " · {{count}} left",
     "transcribe_already_running": "A transcript run is already in progress.",
-    "transcribe_failed": "Could not start transcribing: {{message}}"
+    "transcribe_failed": "Could not start transcribing: {{message}}",
+    "transcribe_this": "Transcribe this clip",
+    "transcribe_needs_reference": "This voice has no reference clip to transcribe."
   },
   "recording": {
     "cleaned_loaded": "Recording cleaned and loaded.",

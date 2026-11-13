@@ -4,6 +4,7 @@ import {
   bulkTranscribeStatus,
   cancelBulkTranscribe,
   startBulkTranscribe,
+  transcribeProfileReference,
   trimProfileAudio,
   type BulkTranscribeStatus,
 } from '@/lib/api/profiles';
@@ -74,6 +75,29 @@ export function useCancelBulkTranscribe() {
     onSuccess: async (result) => {
       queryClient.setQueryData(queryKeys.bulkTranscribe, result);
       await queryClient.invalidateQueries({ queryKey: queryKeys.profiles });
+    },
+  });
+}
+
+/**
+ * Transcribe the reference clip of one profile (#3925).
+ *
+ * The editor calls this after a cut, which clears the transcript because the
+ * old text describes audio that no longer exists. One clip, one ASR pass —
+ * the library-wide run would re-read every other saved voice too.
+ */
+export function useTranscribeProfileReference() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => transcribeProfileReference(id),
+    onSuccess: async () => {
+      // Refresh the list so the library shows the transcript the route stored.
+      // The text itself travels back to the caller, which fills the open
+      // editor's own field from it without waiting for the refetch.
+      await queryClient.invalidateQueries({ queryKey: queryKeys.profiles });
+    },
+    onError: (error) => {
+      toast.error(tr('clone.transcribe_failed', { message: describeError(error) }));
     },
   });
 }

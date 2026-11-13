@@ -30,6 +30,7 @@ import { createObjectUrl, revokeObjectUrl } from '@/lib/audio/object-url';
 import { cn } from '@/lib/utils';
 import { ReferenceSourcePicker, ReferenceUsageNote } from './reference-input';
 import { CutReferencePanel } from './cut-reference-panel';
+import { TranscribeReferenceButton } from './transcribe-reference-button';
 import { ProfileImageEditor } from './profile-image-editor';
 import { formatRelative } from './format';
 import { useTtsReadiness } from '@/hooks/use-tts-readiness';
@@ -255,11 +256,20 @@ export function EditProfile({ profile, onDone }: { profile: Profile; onDone: () 
             </div>
           )}
           {!replacement && !choosing && canReplace && (
-            <CutReferencePanel
-              profile={profile}
-              durationSeconds={referenceDuration}
-              disabled={unavailable}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <CutReferencePanel
+                profile={profile}
+                durationSeconds={referenceDuration}
+                disabled={unavailable}
+              />
+              <TranscribeReferenceButton
+                profile={profile}
+                disabled={unavailable}
+                onTranscript={(text) =>
+                  setDraft((previous) => ({ ...previous, ref_text: text }))
+                }
+              />
+            </div>
           )}
           {(replacement || choosing) && (
             <p role="note" className="text-xs text-muted-foreground">

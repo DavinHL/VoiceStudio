@@ -757,7 +757,9 @@
     "transcribe_progress": "正在转写 {{done}}/{{total}}",
     "transcribe_remaining": " · 剩余 {{count}}",
     "transcribe_already_running": "转写任务已在进行中。",
-    "transcribe_failed": "无法开始转写：{{message}}"
+    "transcribe_failed": "无法开始转写：{{message}}",
+    "transcribe_this": "转写此片段",
+    "transcribe_needs_reference": "此声音没有可转写的参考片段。"
   },
   "designWorkspace": {
     "title": "设计",

@@ -742,7 +742,9 @@
     "transcribe_progress": "Transkriberar {{done}}/{{total}}",
     "transcribe_remaining": " · {{count}} kvar",
     "transcribe_already_running": "En transkription pågår redan.",
-    "transcribe_failed": "Kunde inte starta transkriptionen: {{message}}"
+    "transcribe_failed": "Kunde inte starta transkriptionen: {{message}}",
+    "transcribe_this": "Transkribera det här klippet",
+    "transcribe_needs_reference": "Den här rösten har inget referensklipp att transkribera."
   },
   "designWorkspace": {
     "title": "Designa",

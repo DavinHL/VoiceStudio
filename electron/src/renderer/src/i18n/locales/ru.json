@@ -752,7 +752,9 @@
     "transcribe_progress": "Расшифровка {{done}}/{{total}}",
     "transcribe_remaining": " · осталось {{count}}",
     "transcribe_already_running": "Расшифровка уже выполняется.",
-    "transcribe_failed": "Не удалось начать расшифровку: {{message}}"
+    "transcribe_failed": "Не удалось начать расшифровку: {{message}}",
+    "transcribe_this": "Распознать этот фрагмент",
+    "transcribe_needs_reference": "У этого голоса нет референсного фрагмента для распознавания."
   },
   "designWorkspace": {
     "title": "Создать",

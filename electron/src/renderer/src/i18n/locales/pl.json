@@ -752,7 +752,9 @@
     "transcribe_progress": "Transkrypcja {{done}}/{{total}}",
     "transcribe_remaining": " · zostało {{count}}",
     "transcribe_already_running": "Transkrypcja już trwa.",
-    "transcribe_failed": "Nie udało się rozpocząć transkrypcji: {{message}}"
+    "transcribe_failed": "Nie udało się rozpocząć transkrypcji: {{message}}",
+    "transcribe_this": "Transkrybuj ten klip",
+    "transcribe_needs_reference": "Ten głos nie ma klipu referencyjnego do transkrypcji."
   },
   "designWorkspace": {
     "title": "Projektuj",

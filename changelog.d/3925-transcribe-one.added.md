@@ -1,0 +1,1 @@
+Transcribe a clone's reference clip from the editor, without running the whole library (#3925)

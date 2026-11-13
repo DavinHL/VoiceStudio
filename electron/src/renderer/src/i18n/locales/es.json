@@ -744,7 +744,9 @@
     "transcribe_progress": "Transcribiendo {{done}}/{{total}}",
     "transcribe_remaining": " · quedan {{count}}",
     "transcribe_already_running": "Ya hay una transcripción en curso.",
-    "transcribe_failed": "No se pudo iniciar la transcripción: {{message}}"
+    "transcribe_failed": "No se pudo iniciar la transcripción: {{message}}",
+    "transcribe_this": "Transcribir este audio",
+    "transcribe_needs_reference": "Esta voz no tiene audio de referencia que transcribir."
   },
   "designWorkspace": {
     "title": "Diseñar",

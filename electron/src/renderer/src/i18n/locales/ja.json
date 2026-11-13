@@ -742,7 +742,9 @@
     "transcribe_progress": "書き起こし中 {{done}}/{{total}}",
     "transcribe_remaining": " · 残り {{count}}",
     "transcribe_already_running": "書き起こしはすでに実行中です。",
-    "transcribe_failed": "書き起こしを開始できませんでした: {{message}}"
+    "transcribe_failed": "書き起こしを開始できませんでした: {{message}}",
+    "transcribe_this": "この音声を文字起こし",
+    "transcribe_needs_reference": "この声には文字起こしする参照音声がありません。"
   },
   "designWorkspace": {
     "title": "デザイン",

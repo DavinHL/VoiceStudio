@@ -336,6 +336,47 @@ async def cancel_bulk_transcribe():
     return {"cancelled": True, **_bulk_transcribe_snapshot()}
 
 
+@router.post("/profiles/{profile_id}/transcript/auto")
+async def transcribe_profile_reference(profile_id: str):
+    """Transcribe one profile's reference clip and return the text (#3925).
+
+    The library-wide run is the right tool for filling a backlog, but the
+    editor is open on a single voice — and a cut clears the transcript, so the
+    step that follows a cut must not cost an ASR pass per saved clip. The
+    result is written to the row as well, so the clip is transcribed once.
+    """
+    if not _PROFILE_ID_RE.fullmatch(profile_id):
+        raise HTTPException(status_code=400, detail="Invalid profile id.")
+    with db_conn() as conn:
+        row = conn.execute(
+            "SELECT kind, ref_audio_path FROM voice_profiles WHERE id=?", (profile_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Profile not found.")
+    if (row["kind"] or "clone") == "design":
+        raise HTTPException(
+            status_code=409, detail="A designed voice has no reference clip to transcribe."
+        )
+    name = str(row["ref_audio_path"] or "")
+    path = _voices_path(name) if name else None
+    if not path or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="This voice has no reference clip.")
+    try:
+        text = (await _transcribe_clip(path) or "").strip()
+    except Exception as exc:  # noqa: BLE001 — report the ASR failure to the user
+        logger.warning("reference transcription failed for %s: %s", profile_id, exc)
+        raise HTTPException(
+            status_code=422,
+            detail="That recording could not be transcribed. Check that it contains speech.",
+        ) from exc
+    if not text:
+        return {"id": profile_id, "ref_text": "", "transcribed": False}
+    with db_conn() as conn:
+        conn.execute("UPDATE voice_profiles SET ref_text=? WHERE id=?", (text, profile_id))
+    event_bus.emit("profiles", {"action": "updated", "id": profile_id})
+    return {"id": profile_id, "ref_text": text, "transcribed": True}
+
+
 @router.get("/personalities")
 def list_personalities():
     """Return built-in voice personality presets."""

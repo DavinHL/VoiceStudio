@@ -1,0 +1,22 @@
+Transcribe one reference clip from the editor
+
+Cutting a reference clip clears its transcript, because the old text
+describes audio that no longer exists. The only way to fill it again was
+the library-wide fill on the Saved voices page, so the step that follows a
+cut meant leaving the editor and paying an ASR pass over every other saved
+voice.
+
+Add POST /profiles/{id}/transcript/auto, which transcribes one profile's
+reference clip and stores the text, and put a "Transcribe this clip" button
+next to "Cut reference" in the Edit voice panel. The button fills the
+editor's transcript field with what the route returned, so the voice is
+ready to save without a page change.
+
+The route reports a broken decoder as a failure rather than as silence: it
+calls the ASR directly, unlike the save-time helper that swallows every
+error to keep profile save usable.
+
+Tests: tests/test_profile_reference_tools_3925.py covers the fill, a silent
+clip, a broken decoder, a designed voice and an unknown id;
+transcribe-reference-button.test.tsx covers the button, including that a
+blank result does not wipe text the user already typed.

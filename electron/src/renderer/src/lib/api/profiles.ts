@@ -147,3 +147,22 @@ export async function cancelBulkTranscribe(): Promise<
     method: 'DELETE',
   });
 }
+
+export interface ProfileTranscribeResult {
+  id: string;
+  ref_text: string;
+  transcribed: boolean;
+}
+
+/**
+ * Transcribe one profile's reference clip and store the text (#3925).
+ *
+ * The editor uses this after a cut cleared the transcript, so the voice is
+ * ready to render again without transcribing the whole library.
+ */
+export async function transcribeProfileReference(id: string): Promise<ProfileTranscribeResult> {
+  return apiJson<ProfileTranscribeResult>(
+    `/profiles/${encodeURIComponent(id)}/transcript/auto`,
+    { method: 'POST' },
+  );
+}

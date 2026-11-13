@@ -742,7 +742,9 @@
     "transcribe_progress": "{{done}}/{{total}} प्रतिलेखन",
     "transcribe_remaining": " · {{count}} शेष",
     "transcribe_already_running": "प्रतिलेखन पहले से चल रहा है।",
-    "transcribe_failed": "प्रतिलेखन शुरू नहीं हो सका: {{message}}"
+    "transcribe_failed": "प्रतिलेखन शुरू नहीं हो सका: {{message}}",
+    "transcribe_this": "इस क्लिप का ट्रांसक्रिप्ट बनाएँ",
+    "transcribe_needs_reference": "इस आवाज़ में ट्रांसक्राइब करने के लिए कोई संदर्भ क्लिप नहीं है।"
   },
   "designWorkspace": {
     "title": "डिज़ाइन",

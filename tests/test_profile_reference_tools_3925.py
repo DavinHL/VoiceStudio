@@ -107,6 +107,70 @@ def stub_cut(monkeypatch):
 # ── Cutting the reference ───────────────────────────────────────────────
 
 
+def test_transcribe_one_voice_fills_its_transcript(env, monkeypatch):
+    client, profiles, _db, _voices, created, events = env
+    stub_asr(monkeypatch, text="Halo, Pong.")
+    events.clear()
+
+    body = client.post(f"/profiles/{created['id']}/transcript/auto").json()
+
+    assert body == {"id": created["id"], "ref_text": "Halo, Pong.", "transcribed": True}
+    stored = next(p for p in client.get("/profiles").json() if p["id"] == created["id"])
+    assert stored["ref_text"] == "Halo, Pong."
+    # The library listens for this to refresh the row without a manual reload.
+    assert ("profiles", {"action": "updated", "id": created["id"]}) in events
+
+
+def test_transcribe_one_voice_reports_a_silent_clip_without_writing(env, monkeypatch):
+    client, profiles, _db, _voices, created, _events = env
+    stub_asr(monkeypatch, text="   ")
+
+    body = client.post(f"/profiles/{created['id']}/transcript/auto").json()
+
+    # Silence is not an error, but it must not be stored as an empty string
+    # overwrite either: the field stays as the user left it.
+    assert body == {"id": created["id"], "ref_text": "", "transcribed": False}
+
+
+def test_transcribe_one_voice_reports_a_broken_decoder(env, monkeypatch):
+    client, profiles, _db, _voices, created, _events = env
+
+    def boom(_path):
+        raise RuntimeError("cudnn_ops_infer64_8.dll cannot be loaded")
+
+    stub_asr(monkeypatch, text=boom)
+
+    response = client.post(f"/profiles/{created['id']}/transcript/auto")
+
+    # Unlike the save-time helper, this reports the failure rather than
+    # pretending the clip held no speech.
+    assert response.status_code == 422
+    assert "could not be transcribed" in response.json()["detail"]
+
+
+def test_transcribe_one_voice_rejects_design_voices_and_unknown_ids(env):
+    client, profiles, db, voices, created, _events = env
+    # A designed voice stores its sample render as its reference, but it has no
+    # recording to transcribe — the sample came from the model, not the user.
+    with db.db_conn() as conn:
+        conn.execute("UPDATE voice_profiles SET kind='design' WHERE id=?", (created["id"],))
+
+    assert client.post(f"/profiles/{created['id']}/transcript/auto").status_code == 409
+    assert client.post("/profiles/does-not-exist/transcript/auto").status_code == 404
+    assert client.post("/profiles/..%2Fetc/transcript/auto").status_code in (400, 404)
+
+
+def test_transcribe_one_voice_needs_a_clip_on_disk(env):
+    client, profiles, db, voices, created, _events = env
+    with db.db_conn() as conn:
+        conn.execute("UPDATE voice_profiles SET ref_audio_path='' WHERE id=?", (created["id"],))
+
+    response = client.post(f"/profiles/{created['id']}/transcript/auto")
+
+    assert response.status_code == 404
+    assert "no reference clip" in response.json()["detail"]
+
+
 def test_cut_writes_a_new_versioned_file_and_clears_the_lock(env, stub_cut):
     client, profiles, db, voices, created, events = env
     pid = created["id"]

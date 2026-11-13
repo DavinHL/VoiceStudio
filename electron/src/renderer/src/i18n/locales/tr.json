@@ -742,7 +742,9 @@
     "transcribe_progress": "Yazıya dökülüyor {{done}}/{{total}}",
     "transcribe_remaining": " · {{count}} kaldı",
     "transcribe_already_running": "Zaten sürmekte olan bir transkript işlemi var.",
-    "transcribe_failed": "Yazıya dökme başlatılamadı: {{message}}"
+    "transcribe_failed": "Yazıya dökme başlatılamadı: {{message}}",
+    "transcribe_this": "Bu klibi yazıya dök",
+    "transcribe_needs_reference": "Bu sesin yazıya dökülecek referans klibi yok."
   },
   "designWorkspace": {
     "title": "Tasarla",

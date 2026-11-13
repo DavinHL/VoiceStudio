@@ -742,7 +742,9 @@
     "transcribe_progress": "Menranskrip {{done}}/{{total}}",
     "transcribe_remaining": " · sisa {{count}}",
     "transcribe_already_running": "Proses transkrip sedang berjalan.",
-    "transcribe_failed": "Gagal memulai transkrip: {{message}}"
+    "transcribe_failed": "Gagal memulai transkrip: {{message}}",
+    "transcribe_this": "Transkrip klip ini",
+    "transcribe_needs_reference": "Suara ini tidak punya klip referensi untuk ditranskrip."
   },
   "designWorkspace": {
     "title": "Desain",
