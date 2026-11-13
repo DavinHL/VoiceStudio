@@ -362,7 +362,10 @@ function useGenerateController(): UseGenerateClone {
         if (wording && instructVocabulary !== 'freeform') instruct = announceInstructWarnings(free);
         const input = {
           text: design?.text ?? settings.text,
-          seed: design?.seed,
+          // A clone take is stochastic, so a pinned seed is the only way to
+          // render the same delivery twice; a design keeps its own seed because
+          // the design draft owns that voice's identity (#526).
+          seed: design?.seed ?? settings.seed ?? undefined,
           language: design?.language ?? settings.language,
           // A preset-only engine renders its preset voice; sending the saved
           // voice or clip would be refused (it cannot clone).

@@ -1,14 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { engineTrimsReference, referenceUsageNote } from './reference-usage';
+import { engineTrimsReference, recommendedRefRange, referenceUsageNote } from './reference-usage';
 
-const omnivoice = { max_ref_seconds: 20, ref_strategy: 'best_window' } as const;
-const voxcpm = { max_ref_seconds: 30, ref_strategy: 'head' } as const;
-const unverified = { max_ref_seconds: null, ref_strategy: null };
+const omnivoice = { id: 'omnivoice', max_ref_seconds: 20, ref_strategy: 'best_window' } as const;
+const voxcpm = { id: 'voxcpm2', max_ref_seconds: 30, ref_strategy: 'head' } as const;
+const unverified = { id: 'other', max_ref_seconds: null, ref_strategy: null };
+
+describe('recommendedRefRange', () => {
+  it('narrows the recommendation for an engine that documents its own', () => {
+    expect(recommendedRefRange(omnivoice)).toEqual([3, 10]);
+  });
+
+  it('falls back to the shared recommendation for anything else', () => {
+    expect(recommendedRefRange(voxcpm)).toEqual([5, 15]);
+    expect(recommendedRefRange(null)).toEqual([5, 15]);
+    expect(recommendedRefRange(undefined)).toEqual([5, 15]);
+  });
+});
 
 describe('referenceUsageNote', () => {
-  it('stays quiet inside the 5–15 s recommendation', () => {
-    expect(referenceUsageNote(omnivoice, 12)).toBeNull();
+  it('stays quiet inside the recommendation', () => {
+    expect(referenceUsageNote(omnivoice, 5)).toBeNull();
+    expect(referenceUsageNote(omnivoice, 10)).toBeNull();
+    expect(referenceUsageNote(voxcpm, 12)).toBeNull();
     expect(referenceUsageNote(omnivoice, null)).toBeNull();
+  });
+
+  it('names the floor a clip falls under', () => {
+    expect(referenceUsageNote(omnivoice, 2)).toEqual({ kind: 'short', seconds: 3 });
+    expect(referenceUsageNote(voxcpm, 4)).toEqual({ kind: 'short', seconds: 5 });
   });
 
   it('names the passage an OmniVoice-style engine picks from a long clip', () => {
@@ -23,7 +42,7 @@ describe('referenceUsageNote', () => {
   });
 
   it('makes no engine claim when the clip fits or the engine is unverified', () => {
-    expect(referenceUsageNote(omnivoice, 18)).toEqual({ kind: 'long', seconds: 15 });
+    expect(referenceUsageNote(omnivoice, 18)).toEqual({ kind: 'long', seconds: 10 });
     expect(referenceUsageNote(unverified, 60)).toEqual({ kind: 'long', seconds: 15 });
     expect(referenceUsageNote(null, 60)).toEqual({ kind: 'long', seconds: 15 });
   });

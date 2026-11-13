@@ -767,3 +767,27 @@ it.each([['clone', false], ['design', false], ['clone', true], ['design', true]]
     }
   },
 );
+
+describe('clone seed', () => {
+  it.each([
+    [42, 42],
+    [0, 0],
+    [null, undefined],
+  ] as const)(
+    'sends a pinned clone seed (%j) and omits an unpinned one',
+    async (pinned, sent) => {
+      patchCloneSettings({ text: 'Seed test', selectedProfileId: 'voice-1', seed: pinned, autoPlay: false });
+      vi.mocked(generateClone).mockReset().mockRejectedValue(new Error('stop'));
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <GenerationProvider>
+            <Consumer name="seed" />
+          </GenerationProvider>
+        </QueryClientProvider>,
+      );
+      fireEvent.click(screen.getByText('seed:idle'));
+      await waitFor(() => expect(generateClone).toHaveBeenCalled());
+      expect(vi.mocked(generateClone).mock.calls[0][0].seed).toBe(sent);
+    },
+  );
+});

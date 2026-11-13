@@ -42,6 +42,8 @@ const settings = {
   language: 'Auto',
   refText: '',
   instruct: '',
+  direction: '',
+  seed: null as number | null,
   steps: 32,
   cfg: 2,
   speed: 1,
@@ -161,8 +163,33 @@ describe('ActionBar', () => {
     expect(resetVoiceControls).toHaveBeenCalled();
   });
 
-  it('offers an icon-only reset in the Voice controls header', () => {
-    render(<VoiceControls />);
+  it('pins a take seed so a good style can be rendered twice', () => {
+    settings.seed = null;
+    setCloneSetting.mockClear();
+    render(<ProductionSettings />);
+    const field = screen.getByLabelText('Seed');
+    fireEvent.change(field, { target: { value: '42' } });
+    expect(setCloneSetting).toHaveBeenCalledWith('seed', 42);
+  });
+
+  it('hands the seed back to the engine when the field is emptied', () => {
+    settings.seed = 42;
+    setCloneSetting.mockClear();
+    render(<ProductionSettings />);
+    expect(screen.getByLabelText('Seed')).toHaveValue('42');
+    fireEvent.change(screen.getByLabelText('Seed'), { target: { value: '' } });
+    expect(setCloneSetting).toHaveBeenCalledWith('seed', null);
+  });
+
+  it('ignores a seed outside the engine range instead of storing it', () => {
+    settings.seed = null;
+    setCloneSetting.mockClear();
+    render(<ProductionSettings />);
+    fireEvent.change(screen.getByLabelText('Seed'), { target: { value: '2147483648' } });
+    expect(setCloneSetting).not.toHaveBeenCalledWith('seed', 2147483648);
+  });
+
+  it('offers an icon-only reset in the Voice controls header', () => {    render(<VoiceControls />);
     fireEvent.click(screen.getByRole('button', { name: 'Voice controls' }));
     const reset = screen.getByRole('button', { name: 'Reset to defaults' });
     expect(reset.textContent).toBe('');

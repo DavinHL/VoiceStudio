@@ -118,6 +118,14 @@ describe('toGenerateForm', () => {
     expect(toGenerateForm({ ...BASE_INPUT, presetVoice: 'F3' }).get('preset_voice')).toBe('F3');
   });
 
+  it('sends a pinned clone seed and omits an unpinned one', () => {
+    expect(toGenerateForm({ ...BASE_INPUT, seed: 0 }).get('seed')).toBe('0');
+    expect(toGenerateForm({ ...BASE_INPUT, seed: 2147483647 }).get('seed')).toBe('2147483647');
+    // null and undefined both mean "the engine draws its own seed".
+    expect(toGenerateForm({ ...BASE_INPUT, seed: null }).has('seed')).toBe(false);
+    expect(toGenerateForm(BASE_INPUT).has('seed')).toBe(false);
+  });
+
   it('keeps existing defaults and sends explicit quality choices', () => {
     const defaults = toGenerateForm(BASE_INPUT);
     expect(defaults.get('wav_bits')).toBe('16');

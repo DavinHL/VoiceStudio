@@ -13,7 +13,14 @@ import type { CloneGenerateInput, GenerateResult } from './types';
 import { beginAppActivity } from '@/lib/app-activity';
 import { createStreamingPreview } from '@/lib/audio/streaming-preview';
 
-/** Upper end of the recommended 5–15 s reference; longer clips get an engine-aware note. */
+/**
+ * Lower end of the recommended reference. Below this the clip is too short to
+ * carry the delivery zero-shot cloning mirrors: the default engine's own guide
+ * asks for 3–10 s (docs/engines/omnivoice.md). Engines that document a
+ * different range override it in `lib/reference-usage.ts`.
+ */
+export const REF_MIN_SECONDS = 5;
+/** Upper end of the shared 5–15 s recommendation; engines with their own range override it. */
 export const CLONE_MAX_SECONDS = 15;
 /**
  * Hard cap. OmniVoice's automatic passage selection examines at most five 15 s
@@ -141,7 +148,9 @@ function instructField(input: CloneGenerateInput): string {
 export function toGenerateForm(input: CloneGenerateInput): FormData {
   const form = new FormData();
   form.append('text', input.text);
-  if (input.seed !== undefined && Number.isInteger(input.seed))
+  // A null seed means "the engine draws one", which is the same request as
+  // omitting it, so neither reaches the wire.
+  if (input.seed !== undefined && input.seed !== null && Number.isInteger(input.seed))
     form.append('seed', String(input.seed));
   // Auto must be explicit: omission inherits the saved profile's default.
   if (input.language) form.append('language', input.language);

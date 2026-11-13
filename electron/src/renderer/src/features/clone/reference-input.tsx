@@ -68,7 +68,7 @@ function useIngest(onAccept?: AcceptReference, sharedPick?: PickToken): IngestFn
   };
 }
 
-/** How much of a clip longer than the 5–15 s recommendation the active engine uses. */
+/** How much of a clip outside the active engine's recommended range it uses or needs. */
 export function ReferenceUsageNote({ durationSeconds }: { durationSeconds: number | null }) {
   const { t } = useTranslation();
   const { activeTts } = useEngines();
@@ -80,7 +80,9 @@ export function ReferenceUsageNote({ durationSeconds }: { durationSeconds: numbe
         ? t('clone.ref_usage_best_window', { seconds: note.seconds })
         : note.kind === 'head'
           ? t('clone.ref_usage_head', { seconds: note.seconds })
-          : t('clone.ref_usage_long', { seconds: note.seconds })}
+          : note.kind === 'short'
+            ? t('clone.ref_usage_short', { seconds: note.seconds })
+            : t('clone.ref_usage_long', { seconds: note.seconds })}
     </p>
   );
 }

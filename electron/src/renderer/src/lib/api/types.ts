@@ -173,7 +173,8 @@ export interface CloneGenerateInput {
   presetVoice?: string;
   wavBits?: 16 | 24 | 32;
   effectPreset?: 'broadcast' | 'raw';
-  seed?: number;
+  /** Pinned take seed; `null`/unset lets the engine draw and echo its own. */
+  seed?: number | null;
   text: string;
   /** Display-name language ("English"). "Auto" is omitted on the wire. */
   language: string;

@@ -45,6 +45,7 @@ import {
   type CloneSettings,
 } from '@/lib/store/clone-settings';
 import { cn } from '@/lib/utils';
+import { MAX_SEED, pickDesignSeed } from '@shared/utils/seed';
 import { EngineLanguagePicker } from './engine-language-picker';
 import { PresetVoicePicker } from './preset-voice-picker';
 import { CloneReadinessNotice } from './clone-readiness-notice';
@@ -197,6 +198,49 @@ interface OverridesProps {
   settings: CloneSettings;
 }
 
+function SeedField({ settings }: OverridesProps) {
+  const { t } = useTranslation();
+  const seedId = useId();
+  const pinned = settings.seed !== null;
+  return (
+    <div className="flex min-w-0 flex-col gap-2 px-1 py-2">
+      <Label htmlFor={seedId} className="gap-1.5 text-xs font-medium">
+        <ShuffleIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
+        {t('clone.seed_label')}
+      </Label>
+      <div className="flex items-center gap-1">
+        <Input
+          id={seedId}
+          inputMode="numeric"
+          value={settings.seed ?? ''}
+          onChange={(event) => {
+            const raw = event.target.value.trim();
+            // Blank hands the choice back to the engine, which draws and echoes
+            // its own seed — the same state a fresh install clones in.
+            if (raw === '') return setCloneSetting('seed', null);
+            const seed = Number(raw);
+            if (Number.isInteger(seed) && seed >= 0 && seed <= MAX_SEED)
+              setCloneSetting('seed', seed);
+          }}
+          placeholder={t('clone.seed_placeholder')}
+          className="h-7 text-xs tabular-nums"
+        />
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={pinned ? t('clone.seed_clear') : t('clone.seed_reroll')}
+          title={pinned ? t('clone.seed_clear') : t('clone.seed_reroll')}
+          onClick={() =>
+            setCloneSetting('seed', pinned ? null : pickDesignSeed(false, null))
+          }
+        >
+          {pinned ? <XIcon /> : <ShuffleIcon />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function Overrides({ settings }: OverridesProps) {
   const { t } = useTranslation();
   const durationId = useId();
@@ -221,6 +265,7 @@ function Overrides({ settings }: OverridesProps) {
               className="h-7 text-xs tabular-nums"
             />
           </div>
+          <SeedField settings={settings} />
         </div>
         <p className="px-1 text-[11px] text-muted-foreground">{t('voiceControls.basics')}</p>
       </div>

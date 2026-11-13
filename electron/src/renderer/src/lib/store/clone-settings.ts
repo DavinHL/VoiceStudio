@@ -2,6 +2,7 @@ import { Store } from '@tanstack/store';
 import { useStore } from '@tanstack/react-store';
 import { debounce } from '@tanstack/react-pacer';
 import { onStorageKey } from '@/lib/storage-events';
+import { MAX_SEED } from '@shared/utils/seed';
 
 export const CLONE_SETTINGS_STORAGE_KEY = 'voicestudio.clone.settings.v1';
 const PERSIST_DEBOUNCE_MS = 250;
@@ -21,6 +22,13 @@ export interface CloneSettings {
   emotionVector: number[];
   /** Written delivery direction, sent only to engines whose instruct steers a clone (#3422). */
   direction: string;
+  /**
+   * Pinned take seed, or `null` to let the engine draw one. Zero-shot cloning
+   * is stochastic, so a pinned seed is what makes a good take repeatable: the
+   * same reference + seed + text renders the same audio, which is how a style
+   * setting can be A/B compared instead of guessed at.
+   */
+  seed: number | null;
   steps: number;
   wavBits: 16 | 24 | 32;
   effectPreset: 'broadcast' | 'raw';
@@ -51,6 +59,7 @@ export const DEFAULT_CLONE_SETTINGS: CloneSettings = {
   emotionAlpha: 0.6,
   emotionVector: [0, 0, 0, 0, 0, 0, 0, 0],
   direction: '',
+  seed: null,
   steps: 16, // ~16 avoids ODE destabilisation in the flow-matcher.
   wavBits: 16,
   effectPreset: 'broadcast',
@@ -85,6 +94,11 @@ export function acceptsCloneSetting(key: keyof CloneSettings, value: unknown): b
   if (key === 'wavBits') return value === 16 || value === 24 || value === 32;
   if (key === 'effectPreset') return value === 'broadcast' || value === 'raw';
   if (key === 'selectedProfileId') return value === null || typeof value === 'string';
+  if (key === 'seed')
+    return (
+      value === null ||
+      (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_SEED)
+    );
   const expected = typeof DEFAULT_CLONE_SETTINGS[key];
   if (typeof value !== expected) return false;
   return expected !== 'number' || Number.isFinite(value);
@@ -191,6 +205,7 @@ export function resetVoiceControls(): void {
     emotionText,
     emotionAlpha,
     emotionVector,
+    seed,
   } = DEFAULT_CLONE_SETTINGS;
   patchCloneSettings({
     cfg,
@@ -206,6 +221,7 @@ export function resetVoiceControls(): void {
     emotionText,
     emotionAlpha,
     emotionVector: [...emotionVector],
+    seed,
   });
 }
 
@@ -226,6 +242,7 @@ export function resetOverrides(): void {
     denoise,
     postprocess,
     duration: DEFAULT_CLONE_SETTINGS.duration,
+    seed: DEFAULT_CLONE_SETTINGS.seed,
     emotionMode: DEFAULT_CLONE_SETTINGS.emotionMode,
     emotionText: DEFAULT_CLONE_SETTINGS.emotionText,
     emotionAlpha: DEFAULT_CLONE_SETTINGS.emotionAlpha,

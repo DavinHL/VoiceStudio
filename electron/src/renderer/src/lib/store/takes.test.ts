@@ -186,6 +186,7 @@ describe('take metadata', () => {
       emotionAlpha: 0.4,
       emotionVector: [0.2, 0, 0, 0, 0, 0, 0, 0],
       direction: 'nervous, then bold',
+      seed: 7,
       steps: 32,
       wavBits: 24,
       effectPreset: 'raw',
