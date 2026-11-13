@@ -195,3 +195,9 @@ backend/assets/samples/demo/dubbing/*.src.wav
 /.devdata/
 /.devcache/
 /.devhf/
+
+# Scratch written by ad-hoc debugging sessions: probe scripts, screenshots,
+# sample renders and the temp trees pytest leaves behind when it runs with
+# `--basetemp` unset. None of it is an artifact the app or CI ever reads.
+/.dbg*/
+/pytest-of-*/
