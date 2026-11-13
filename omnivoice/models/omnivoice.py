@@ -1562,8 +1562,13 @@ class OmniVoice(PreTrainedModel):
             ref_text = "Nice to meet you."
             num_ref_audio_tokens = 25
 
+        # num_ref_audio_tokens is a token count, so the estimator's floor must be
+        # one too. Its 50-token default is the CLI's SECONDS default (infer_batch
+        # passes 2.0 for the same call) and on this scale it floors every short
+        # utterance at roughly four seconds — the model then fills the surplus
+        # frames by stretching the vowels ("Hello" -> "Halloooooo", #3924).
         est = self.duration_estimator.estimate_duration(
-            text, ref_text, num_ref_audio_tokens
+            text, ref_text, num_ref_audio_tokens, low_threshold=2.0
         )
         if speed > 0 and speed != 1.0:
             est = est / speed

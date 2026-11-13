@@ -219,7 +219,7 @@ class RuleDurationEstimator:
         target_text: str,
         ref_text: str,
         ref_duration: float,
-        low_threshold: Optional[float] = 50,
+        low_threshold: Optional[float] = 2.0,
         boost_strength: float = 3,
     ) -> float:
         """
@@ -231,7 +231,9 @@ class RuleDurationEstimator:
             ref_duration (float): The actual duration it took
                 to speak the ref_text.
             low_threshold (float): The minimum duration threshold below which the
-                estimation will be considered unreliable.
+                estimation will be considered unreliable. Expressed in the SAME
+                unit as ``ref_duration``: pass audio-token counts when
+                ``ref_duration`` is a token count (#3924).
             boost_strength (float): Controls the power-curve boost for short durations.
                 Higher values boost small durations more aggressively.
                 1 = no boost (linear), 2 = sqrt-like
