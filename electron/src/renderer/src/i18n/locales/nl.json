@@ -706,6 +706,7 @@
     "download_wav": "WAV (verliesvrij)",
     "download_mp3": "MP3 (kleiner bestand)",
     "saved_to": "Opgeslagen in {{path}}",
+    "downloaded_as": "Gedownload als {{name}}",
     "history_title": "Recente opnames",
     "history_empty": "Nog geen opnames.",
     "history_delete": "Verwijder opname",

@@ -523,6 +523,7 @@
     "download_mp3": "MP3 (smaller file)",
     "reveal": "Show in folder",
     "saved_to": "Saved to {{path}}",
+    "downloaded_as": "Downloaded as {{name}}",
     "history_title": "Recent takes",
     "history_empty": "No takes yet.",
     "history_clear": "Clear history",

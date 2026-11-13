@@ -693,6 +693,7 @@
     "download_wav": "WAV（无损）",
     "download_mp3": "MP3（文件更小）",
     "saved_to": "保存到 {{path}}",
+    "downloaded_as": "已下载为 {{name}}",
     "history_title": "最近拍摄的",
     "history_empty": "还没有拍摄。",
     "history_clear_confirm": "从历史记录中删除所有镜头？音频文件也被删除。",

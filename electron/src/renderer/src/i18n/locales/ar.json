@@ -727,6 +727,7 @@
     "download_wav": "WAV (بدون فقدان)",
     "download_mp3": "MP3 (ملف أصغر)",
     "saved_to": "تم الحفظ في {{path}}",
+    "downloaded_as": "تم التنزيل إلى {{name}}",
     "history_title": "اللقطات الأخيرة",
     "history_empty": "لا يأخذ بعد.",
     "history_clear_confirm": "هل تريد حذف كل لقطة من التاريخ؟ تتم إزالة الملفات الصوتية أيضًا.",

@@ -96,7 +96,9 @@ export function DubExportPanel({ session, disabled }: { session: DubSession; dis
       });
       const url = apiPath(request.path);
       const bridge = getBridge();
-      if (bridge) await saveExport(url, request.name);
+      // The panel reports the finished export itself, so the save must not
+      // also raise its own toast.
+      if (bridge) await saveExport(url, request.name, { quiet: true });
       else {
         const response = await fetch(url);
         if (!response.ok) throw await errorFromResponse(response);

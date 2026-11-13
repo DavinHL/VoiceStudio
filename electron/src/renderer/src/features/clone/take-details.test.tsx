@@ -53,6 +53,7 @@ it('exports a historical take through the native save dialog', async () => {
     expect(mock.saveAudio).toHaveBeenCalledWith({
       url: '/audio/history/take-42.wav',
       suggestedName: 'voicestudio-take-42.wav',
+      quiet: false,
     }),
   );
 });
@@ -77,6 +78,7 @@ it('exports a historical take as MP3 from the format menu', async () => {
     expect(mock.saveAudio).toHaveBeenCalledWith({
       url: '/audio/ab12cd34.mp3',
       suggestedName: 'voicestudio-take-42.mp3',
+      quiet: false,
     }),
   );
 });

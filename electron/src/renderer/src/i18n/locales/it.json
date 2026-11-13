@@ -709,6 +709,7 @@
     "download_wav": "WAV (senza perdita)",
     "download_mp3": "MP3 (file più piccolo)",
     "saved_to": "Salvato in {{path}}",
+    "downloaded_as": "Scaricato come {{name}}",
     "history_empty": "Nessuna ripresa ancora.",
     "history_delete": "Elimina ripresa",
     "history_star": "Stella",

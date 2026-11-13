@@ -1,7 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  saveBackendFile: vi.fn(async (): Promise<{ canceled: boolean; path: string } | null> => null),
+  saveBackendFile: vi.fn(
+    async (): Promise<{ canceled: boolean; path: string; native: boolean } | null> => null,
+  ),
   saveLocalFile: vi.fn(async (_blob: Blob, _name: string) => ({ canceled: false })),
   apiJson: vi.fn(async () => ({})),
 }));
@@ -36,14 +38,26 @@ it('downloads through the browser when the desktop bridge is absent', async () =
   expect(fetchMock).toHaveBeenCalledWith('/audio/ab12cd34.wav', { credentials: 'include' });
   expect(mocks.saveLocalFile).toHaveBeenCalledOnce();
   expect(mocks.saveLocalFile.mock.calls[0][1]).toBe('take.wav');
-  expect(result).toMatchObject({ canceled: false });
-  // The browser owns the destination, so there is no path to record.
-  expect(mocks.apiJson).not.toHaveBeenCalled();
+  // The browser owns the destination, so the name stands in for the path —
+  // without it the caller has nothing to confirm the save with (#3923).
+  expect(result).toMatchObject({ canceled: false, path: 'take.wav' });
+  // Nothing worth recording: the browser never reports where the file landed.
+  expect(mocks.apiJson).not.toHaveBeenCalledWith('/export/record', expect.anything());
+});
+
+it('reports a canceled browser download as canceled, with no name', async () => {
+  stubFetch();
+  mocks.saveLocalFile.mockResolvedValueOnce({ canceled: true });
+
+  const result = await saveExport('/audio/ab12cd34.wav', 'take.wav');
+
+  expect(result).toEqual({ canceled: true, path: '', native: false });
+  expect(mocks.apiJson).not.toHaveBeenCalledWith('/export/record', expect.anything());
 });
 
 it('still prefers the native main-process save when a bridge exists', async () => {
   stubFetch();
-  mocks.saveBackendFile.mockResolvedValueOnce({ canceled: false, path: 'C:\\take.wav' });
+  mocks.saveBackendFile.mockResolvedValueOnce({ canceled: false, path: 'C:\\take.wav', native: true });
 
   const result = await saveExport('/audio/ab12cd34.wav', 'take.wav');
 

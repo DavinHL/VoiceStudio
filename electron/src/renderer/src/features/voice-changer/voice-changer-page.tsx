@@ -88,6 +88,7 @@ export function VoiceChangerPage() {
   const [match, setMatch] = useState(true);
   const [language, setLanguage] = useState('Auto');
   const [busy, setBusy] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -218,19 +219,24 @@ export function VoiceChangerPage() {
 
   const saveAll = async () => {
     let saved = 0;
+    // The per-row button already confirms each file; the bulk path must not
+    // stack one toast per clip on top of its own summary.
+    setBulkSaving(true);
     for (const item of done) {
       const name = `${baseName(item.file.name)}-${chosen?.name ?? 'voice'}.wav`;
       try {
         // `saveExport` resolves null when the user closes the save dialog —
         // that is a choice, not a failure, and it must not abort the rest.
-        const result = await saveExport(apiPath(item.result!.audio_url), name);
+        const result = await saveExport(apiPath(item.result!.audio_url), name, { quiet: true });
         if (!result) continue;
         saved += 1;
       } catch (e) {
+        setBulkSaving(false);
         toast.error(describeError(e));
         return;
       }
     }
+    setBulkSaving(false);
     if (saved) toast.success(t('voiceChanger.saved_all', { count: saved }));
   };
 
@@ -518,7 +524,7 @@ export function VoiceChangerPage() {
                 </Button>
               )}
               {done.length > 1 && (
-                <Button variant="ghost" onClick={() => void saveAll()}>
+                <Button variant="ghost" disabled={bulkSaving} onClick={() => void saveAll()}>
                   <DownloadIcon />
                   {t('voiceChanger.save_all', { count: done.length })}
                 </Button>
@@ -574,7 +580,8 @@ export function VoiceChangerPage() {
                         suggestedName={`${baseName(item.file.name)}-${chosen?.name ?? 'voice'}.wav`}
                         disabledHint={t('voiceChanger.save_needs_result')}
                         iconOnly
-                      />                      <Button
+                      />
+                      <Button
                         variant="ghost"
                         size="icon-sm"
                         aria-label={t('voiceChanger.remove')}

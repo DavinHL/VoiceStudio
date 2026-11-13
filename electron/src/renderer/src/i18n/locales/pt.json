@@ -708,6 +708,7 @@
     "download_wav": "WAV (sem perdas)",
     "download_mp3": "MP3 (arquivo menor)",
     "saved_to": "Salvo em {{path}}",
+    "downloaded_as": "Transferido como {{name}}",
     "history_title": "Tomadas recentes",
     "history_empty": "Ainda não há tomadas.",
     "history_delete": "Excluir tomada",

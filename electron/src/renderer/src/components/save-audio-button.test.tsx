@@ -2,7 +2,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  saveExport: vi.fn(async () => ({ canceled: true })),
+  saveExport: vi.fn(
+    async (): Promise<{ canceled: boolean; path?: string; native?: boolean } | null> => ({
+      canceled: true,
+    }),
+  ),
   bridge: { files: { revealPath: vi.fn() } } as object | null,
 }));
 
@@ -14,6 +18,7 @@ vi.mock('./bridge', () => ({ getBridge: () => mocks.bridge }));
 vi.mock('@/lib/export-history', () => ({ saveExport: mocks.saveExport }));
 
 import { audioMp3Url } from '@/lib/api/client';
+import { toast } from 'sonner';
 import { SaveAudioButton } from './save-audio-button';
 
 afterEach(() => {
@@ -27,7 +32,7 @@ it('saves the WAV with one click and offers no format menu without an MP3 URL', 
   expect(screen.queryByRole('button', { name: 'clone.download_format' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: /clone\.download/ }));
   await waitFor(() =>
-    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.wav', 'take.wav'),
+    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.wav', 'take.wav', { quiet: false }),
   );
 });
 
@@ -42,7 +47,7 @@ it('exports the MP3 from the format menu under a matching file name', async () =
   fireEvent.click(screen.getByRole('button', { name: 'clone.download_format' }));
   fireEvent.click(await screen.findByRole('button', { name: 'clone.download_mp3' }));
   await waitFor(() =>
-    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.mp3', 'voicestudio-take.mp3'),
+    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.mp3', 'voicestudio-take.mp3', { quiet: false }),
   );
 });
 
@@ -59,7 +64,7 @@ it('stays clickable in a browser tab, where no desktop bridge exists', async () 
   expect(button).toBeEnabled();
   fireEvent.click(button);
   await waitFor(() =>
-    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.wav', 'take.wav'),
+    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.wav', 'take.wav', { quiet: false }),
   );
 });
 
@@ -76,7 +81,44 @@ it('offers the format menu without a bridge too', async () => {  mocks.bridge = 
   fireEvent.click(format);
   fireEvent.click(await screen.findByRole('button', { name: 'clone.download_mp3' }));
   await waitFor(() =>
-    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.mp3', 'take.mp3'),
+    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.mp3', 'take.mp3', { quiet: false }),
+  );
+});
+
+it('confirms a browser download by name, since the page cannot reveal it', async () => {
+  mocks.bridge = null;
+  mocks.saveExport.mockResolvedValueOnce({ canceled: false, path: 'take.wav' });
+  render(<SaveAudioButton url="/audio/ab12cd34.wav" suggestedName="take.wav" />);
+
+  fireEvent.click(screen.getByRole('button', { name: /clone\.download/ }));
+
+  await waitFor(() =>
+    expect(toast.success).toHaveBeenCalledWith('clone.downloaded_as'),
+  );
+});
+
+it('stays quiet when the browser download is dismissed', async () => {
+  mocks.bridge = null;
+  mocks.saveExport.mockResolvedValueOnce({ canceled: true, path: '' });
+  render(<SaveAudioButton url="/audio/ab12cd34.wav" suggestedName="take.wav" />);
+
+  fireEvent.click(screen.getByRole('button', { name: /clone\.download/ }));
+
+  await waitFor(() => expect(mocks.saveExport).toHaveBeenCalled());
+  expect(toast.success).not.toHaveBeenCalled();
+  expect(toast.error).not.toHaveBeenCalled();
+});
+
+it('keeps the native toast, with a reveal action, when the bridge writes the file', async () => {
+  mocks.saveExport.mockResolvedValueOnce({ canceled: false, path: 'C:\\music\\take.wav' });
+  render(<SaveAudioButton url="/audio/ab12cd34.wav" suggestedName="take.wav" />);
+
+  fireEvent.click(screen.getByRole('button', { name: /clone\.download/ }));
+
+  await waitFor(() =>
+    expect(toast.success).toHaveBeenCalledWith('clone.saved_to', expect.objectContaining({
+      action: expect.objectContaining({ label: 'clone.reveal' }),
+    })),
   );
 });
 
@@ -94,7 +136,7 @@ it('explains an inert Save instead of looking broken, and still saves once ready
   expect(ready).not.toHaveAttribute('title');
   fireEvent.click(ready);
   await waitFor(() =>
-    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.wav', 'take.wav'),
+    expect(mocks.saveExport).toHaveBeenCalledWith('/audio/ab12cd34.wav', 'take.wav', { quiet: false }),
   );
 });
 

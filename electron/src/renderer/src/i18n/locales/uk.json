@@ -717,6 +717,7 @@
     "download_wav": "WAV (без втрат)",
     "download_mp3": "MP3 (менший файл)",
     "saved_to": "Збережено в {{path}}",
+    "downloaded_as": "Завантажено як {{name}}",
     "history_title": "Останні знімки",
     "history_empty": "Поки що немає дублів.",
     "history_delete": "Видалити дубль",

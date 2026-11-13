@@ -523,6 +523,7 @@
     "download_mp3": "MP3 (ficheiro máis pequeno)",
     "reveal": "Mostrar no cartafol",
     "saved_to": "Gardado en {{path}}",
+    "downloaded_as": "Descargado como {{name}}",
     "history_title": "Tomas recentes",
     "history_empty": "Aínda non hai tomas.",
     "history_clear": "Borrar o historial",

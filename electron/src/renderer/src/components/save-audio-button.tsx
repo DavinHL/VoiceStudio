@@ -23,6 +23,7 @@ export function SaveAudioButton({
   disabled = false,
   disabledHint,
   iconOnly = false,
+  quiet = false,
 }: {
   url?: string;
   /** When set, a format menu beside the button also offers an MP3 export. */
@@ -36,6 +37,11 @@ export function SaveAudioButton({
   disabledHint?: string;
   /** A compact secondary action: the label becomes the tooltip. */
   iconOnly?: boolean;
+  /**
+   * Suppress this button's own toast. Used by "Save all", which reports one
+   * summary rather than a toast per file.
+   */
+  quiet?: boolean;
 }) {
   const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
@@ -46,9 +52,19 @@ export function SaveAudioButton({
     if (!target) return;
     setSaving(true);
     try {
-      const saved = await saveExport(target, name);
+      const saved = await saveExport(target, name, { quiet });
       if (!saved) return;
-      if (!saved.canceled && saved.path) {
+      if (!saved.canceled) {
+        if (quiet) return;
+        // A browser download has no path the page can reveal, so it confirms
+        // with the file name instead — one click must never look like nothing
+        // happened (#3923).
+        if (!saved.path) return;
+        const savedAsBrowserDownload = !bridge;
+        if (savedAsBrowserDownload) {
+          toast.success(t('clone.downloaded_as', { name: saved.path }));
+          return;
+        }
         const path = saved.path;
         toast.success(t('clone.saved_to', { path }), {
           action: {
@@ -62,6 +78,7 @@ export function SaveAudioButton({
         });
       }
     } catch (error) {
+      if (quiet) return;
       const message = error instanceof Error ? error.message : String(error);
       toast.error(t('clone.download_failed', { message }));
     } finally {

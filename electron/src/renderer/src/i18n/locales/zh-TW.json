@@ -706,6 +706,7 @@
     "download_wav": "WAV（無損）",
     "download_mp3": "MP3（檔案較小）",
     "saved_to": "儲存到 {{path}}",
+    "downloaded_as": "已下載為 {{name}}",
     "history_title": "最近拍攝的",
     "history_empty": "還沒拍攝。",
     "history_clear_confirm": "從歷史記錄中刪除所有鏡頭？音訊檔案也被刪除。",

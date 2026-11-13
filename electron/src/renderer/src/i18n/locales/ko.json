@@ -695,6 +695,7 @@
     "download_wav": "WAV (무손실)",
     "download_mp3": "MP3 (더 작은 파일)",
     "saved_to": "{{path}}에 저장되었습니다.",
+    "downloaded_as": "{{name}}(으)로 다운로드되었습니다",
     "history_title": "최근 테이크",
     "history_empty": "아직 테이크가 없습니다.",
     "history_delete": "테이크 삭제",

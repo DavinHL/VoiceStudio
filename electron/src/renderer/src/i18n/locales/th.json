@@ -706,6 +706,7 @@
     "download_wav": "WAV (ไม่สูญเสียคุณภาพ)",
     "download_mp3": "MP3 (ไฟล์เล็กกว่า)",
     "saved_to": "บันทึกไปที่ {{path}} แล้ว",
+    "downloaded_as": "ดาวน์โหลดเป็น {{name}} แล้ว",
     "history_title": "ใช้เวลาล่าสุด",
     "history_empty": "ยังไม่มีเทคเลย",
     "history_clear_confirm": "ลบทุกเทคจากประวัติใช่ไหม ไฟล์เสียงจะถูกลบออกด้วย",

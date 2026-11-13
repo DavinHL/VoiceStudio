@@ -23,7 +23,10 @@ export async function saveBackendFile(req: SaveAudioRequest): Promise<SaveAudioR
   const bridge = getBridge();
   if (!bridge) return null;
   try {
-    return await bridge.files.saveAudio(req);
+    const saved = await bridge.files.saveAudio(req);
+    // The native dialog already owns the destination, so this result is always
+    // a real filesystem path — history may record it as one.
+    return { ...saved, native: true };
   } catch (error) {
     throw await nativeSaveError(error);
   }
@@ -34,7 +37,8 @@ export async function saveNativeData(req: SaveDataRequest): Promise<SaveAudioRes
   const bridge = getBridge();
   if (!bridge) return null;
   try {
-    return await bridge.files.saveData(req);
+    const saved = await bridge.files.saveData(req);
+    return { ...saved, native: true };
   } catch (error) {
     throw await nativeSaveError(error);
   }

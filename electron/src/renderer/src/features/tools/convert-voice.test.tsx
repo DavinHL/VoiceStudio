@@ -261,6 +261,7 @@ it('exports the converted take through the shared native save action', async () 
     expect(mock.saveAudio).toHaveBeenCalledWith({
       url: '/api/audio/take-7.wav',
       suggestedName: 'voicestudio-take-7.wav',
+      quiet: false,
     }),
   );
 });

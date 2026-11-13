@@ -707,6 +707,7 @@
     "download_wav": "WAV (không nén mất dữ liệu)",
     "download_mp3": "MP3 (tệp nhỏ hơn)",
     "saved_to": "Đã lưu vào {{path}}",
+    "downloaded_as": "Đã tải xuống dưới tên {{name}}",
     "history_title": "Những cảnh quay gần đây",
     "history_empty": "Chưa có.",
     "history_delete": "Xóa mất",

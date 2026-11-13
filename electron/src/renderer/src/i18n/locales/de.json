@@ -707,6 +707,7 @@
     "download_wav": "WAV (verlustfrei)",
     "download_mp3": "MP3 (kleinere Datei)",
     "saved_to": "Gespeichert unter {{path}}",
+    "downloaded_as": "Heruntergeladen als {{name}}",
     "history_title": "Aktuelle Aufnahmen",
     "history_empty": "Noch keine Takes.",
     "history_delete": "Aufnahme löschen",

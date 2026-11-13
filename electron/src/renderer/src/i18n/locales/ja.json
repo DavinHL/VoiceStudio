@@ -702,6 +702,7 @@
     "output_empty": "生成された音声がここに表示されます。",
     "output_meta": "{{duration}} · {{gen}} でレンダリング",
     "saved_to": "保存元： {{path}}",
+    "downloaded_as": "{{name}} としてダウンロードしました",
     "history_title": "最近のテイク",
     "history_empty": "まだテイクはありません。",
     "history_delete": "テイクを削除する",

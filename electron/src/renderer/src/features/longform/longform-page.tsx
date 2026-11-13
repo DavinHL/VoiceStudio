@@ -197,7 +197,9 @@ export function LongformPage({ mode }: { mode: Mode }) {
     try {
       const url = apiPath('/audio/' + encodeURIComponent(draft.output));
       const bridge = getBridge();
-      if (bridge) await saveExport(url, draft.output.split('/').pop() || 'audiobook.m4b');
+      // The page surfaces its own error/export state, so no save toast here.
+      if (bridge)
+        await saveExport(url, draft.output.split('/').pop() || 'audiobook.m4b', { quiet: true });
       else {
         const link = document.createElement('a');
         link.href = url;

@@ -24,10 +24,16 @@ function exportMode(filename: string): 'audio' | 'video' | 'file' {
  * fallback `saveLocalFile` uses. Without it every export control would be dead
  * in the web build (#3923).
  */
-export async function saveExport(url: string, suggestedName: string) {
-  const saved = (await saveBackendFile({ url, suggestedName })) ?? (await saveBrowserDownload(url, suggestedName));
+export async function saveExport(
+  url: string,
+  suggestedName: string,
+  options: { quiet?: boolean } = {},
+) {
+  const saved =
+    (await saveBackendFile({ url, suggestedName, quiet: options.quiet })) ??
+    (await saveBrowserDownload(url, suggestedName));
   if (!saved) return null;
-  if (!saved.canceled && saved.path) {
+  if (!saved.canceled && saved.path && saved.native) {
     try {
       await apiJson('/export/record', {
         method: 'POST',
@@ -49,10 +55,17 @@ export async function saveExport(url: string, suggestedName: string) {
 /**
  * Browser-tab fallback: fetch the backend URL and save the bytes locally. The
  * browser owns the destination, so there is no path to record in history.
+ *
+ * `saved.path` is the download's name rather than a real filesystem path: the
+ * browser hands the file to the user's download folder and never tells the page
+ * where it landed. Without a name here the caller has nothing to confirm, and
+ * Save as finished in total silence (#3923).
  */
 async function saveBrowserDownload(url: string, suggestedName: string) {
   const res = await fetch(url, { credentials: 'include' });
   if (!res.ok) throw await errorFromResponse(res);
   const saved = await saveLocalFile(await res.blob(), suggestedName);
-  return { canceled: saved.canceled, path: '' };
+  // `native: false` keeps the download's name out of the export history, which
+  // stores real destination paths.
+  return { canceled: saved.canceled, path: saved.canceled ? '' : suggestedName, native: false };
 }

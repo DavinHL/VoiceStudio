@@ -178,7 +178,11 @@ export function BatchPage() {
     );
     try {
       const bridge = getBridge();
-      if (bridge) await saveExport(url, job.filename.replace(/\.[^.]+$/, '') + '_' + lang + '.mp4');
+      // This row already reports its own failures, so the save stays quiet.
+      if (bridge)
+        await saveExport(url, job.filename.replace(/\.[^.]+$/, '') + '_' + lang + '.mp4', {
+          quiet: true,
+        });
       else {
         const link = document.createElement('a');
         link.href = url;

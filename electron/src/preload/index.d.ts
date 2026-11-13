@@ -198,11 +198,23 @@ export interface SaveAudioRequest {
   suggestedName: string;
   /** Backend request method. POST supports generated download endpoints such as persona export. */
   method?: 'GET' | 'POST';
+  /**
+   * Keep the native dialog hidden when it would only be answered by a
+   * programmatic bulk save, which reports one summary instead of one prompt
+   * (and one toast) per file.
+   */
+  quiet?: boolean;
 }
 
 export interface SaveAudioResult {
   canceled: boolean;
   path?: string;
+  /**
+   * Set by `saveBackendFile`/`saveNativeData` when Electron's dialog produced
+   * the result, so `path` is a real filesystem path. The browser-download
+   * fallback reuses `path` for the download's name and leaves this false.
+   */
+  native?: boolean;
 }
 
 export interface SaveDataRequest {
