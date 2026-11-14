@@ -13,6 +13,8 @@ it isn't installed those stages are skipped (audio returned unmodified). The
 leveler and the peak limiter are pure numpy (#3412), so they always run.
 """
 import logging
+import math
+
 import torch
 
 logger = logging.getLogger("omnivoice.dsp")
@@ -127,6 +129,229 @@ def apply_mastering(audio_tensor, sample_rate=24000):
     except Exception as e:
         logger.warning("Mastering DSP Error: %s", e)
         return audio_tensor
+
+
+#: Tone matching (#3930). A clone reference is usually a compressed lossy file
+#: (an MP3 at 192 kb/s loses everything above ~16 kHz and is typically 15-20 dB
+#: down above 4 kHz), while the model renders full-band synthetic speech. The
+#: model reproduces the reference's *pitch* faithfully — the take's F0 lands
+#: within a semitone or two — but it cannot reproduce the reference's *recording
+#: bandwidth*, so the take keeps a bright top end the reference never had. The
+#: result reads as a thin, ringing voice even though the pitch is right, which
+#: is what "the generated voice is too high" reports actually describe.
+#:
+#: Measuring the reference once and tilting the take to match costs nothing per
+#: take and needs no new control surface: the user already chose the reference.
+TONE_MATCH_BANDS = (
+    (0.0, 300.0),
+    (300.0, 1000.0),
+    (1000.0, 3000.0),
+    (3000.0, 8000.0),
+    (8000.0, 16000.0),
+)
+
+#: Most a single band may move. A reference with a genuinely different timbre
+#: (a whisper, a telephone recording) must not drag the take so far that it
+#: stops sounding like the chosen voice. 12 dB is about the point where a band
+#: stops reading as "same voice, right recording" and starts reading as a
+#: filter; the measured MP3-vs-synthetic gap sits inside it.
+TONE_MATCH_MAX_GAIN_DB = 8.0
+
+#: A band within this of its target is left alone: chasing the last fraction of
+#: a dB only piles up more gain changes.
+TONE_MATCH_EPSILON_DB = 0.75
+
+#: Bands quieter than this in the reference carry no usable timbre, only the
+#: noise floor of the codec, so their balance must not be copied.
+TONE_MATCH_FLOOR_DB = -80.0
+
+
+def _band_energies_db(audio_tensor, sample_rate: int) -> list[float]:
+    """Mean energy per :data:`TONE_MATCH_BANDS` band, in dB. ``nan`` per band
+    when the clip is too short to measure it, or when the clip's own sample
+    rate cannot express the band at all (nothing above its Nyquist)."""
+    import numpy as np
+
+    x = audio_tensor.detach().cpu()
+    if x.ndim > 1:
+        x = x.mean(dim=tuple(range(x.ndim - 1)))
+    x = x.numpy().astype(np.float64)
+    if x.size == 0:
+        return [float("nan")] * len(TONE_MATCH_BANDS)
+
+    nyquist = sample_rate / 2.0
+    # A band the clip's rate cannot express is a sampling limit, not a timbre
+    # choice: an 8-16 kHz band on a 24 kHz take is empty by construction and
+    # must never drag the take's real high end down.
+    reachable = [hi <= nyquist for _, hi in TONE_MATCH_BANDS]
+
+    win = 2048
+    if x.size < win:
+        return [float("nan")] * len(TONE_MATCH_BANDS)
+    hop = win // 2
+    freqs = np.fft.rfftfreq(win, 1 / sample_rate)
+    window = np.hanning(win)
+    acc = np.zeros(len(TONE_MATCH_BANDS))
+    frames = 0
+    for i in range(0, x.size - win, hop):
+        frame = x[i:i + win]
+        if np.mean(frame * frame) < 1e-8:
+            continue  # silence says nothing about timbre
+        power = np.abs(np.fft.rfft(frame * window)) ** 2
+        frames += 1
+        for b, (lo, hi) in enumerate(TONE_MATCH_BANDS):
+            acc[b] += power[(freqs >= lo) & (freqs < hi)].sum()
+    if frames == 0:
+        return [float("nan")] * len(TONE_MATCH_BANDS)
+
+    # Per-band mean power, then dB relative to the clip's own total, so the two
+    # clips are compared on shape alone and neither one's overall level (which
+    # a lossy codec can shift by many dB) leaks into the gain.
+    mean_power = acc / frames
+    total = mean_power[reachable].sum()
+    if total <= 0:
+        return [float("nan")] * len(TONE_MATCH_BANDS)
+    out = []
+    for b, value in enumerate(mean_power):
+        if not reachable[b]:
+            out.append(float("nan"))
+        elif value > 0:
+            out.append(10 * np.log10(value / total))
+        else:
+            out.append(float("-inf"))
+    return out
+
+
+def match_reference_tone(
+    audio_tensor: torch.Tensor,
+    sample_rate: int,
+    reference_path: str | None,
+    *,
+    max_gain_db: float = TONE_MATCH_MAX_GAIN_DB,
+) -> torch.Tensor:
+    """Tilt a take's spectrum toward its reference's recording bandwidth.
+
+    Measures both clips per :data:`TONE_MATCH_BANDS` and applies the difference
+    as shelving/peaking filters, so a take of an MP3 reference stops carrying
+    high-frequency energy the reference never had (#3930).
+
+    One measured correction, applied once. A band wider than an octave is
+    covered by several bells (:func:`_band_filters`), because a single bell
+    spills into its neighbours and delivers a fraction of what it is asked for.
+
+    Only the *shape* is copied — the overall level is left to
+    :func:`normalize_audio`. Bands the reference cannot measure (below
+    :data:`TONE_MATCH_FLOOR_DB`, or above its own Nyquist) are skipped, and every
+    band is clamped to ``max_gain_db``. Any failure returns the input unchanged:
+    a take must never be lost to a cosmetic stage.
+    """
+    if reference_path is None or audio_tensor.numel() == 0:
+        return audio_tensor
+    try:
+        from services.audio_io import load_audio
+
+        reference, ref_rate = load_audio(reference_path)
+        if reference is None or reference.numel() == 0:
+            return audio_tensor
+
+        # Both sides are measured in their own native rate: the bands are
+        # absolute frequencies and each clip's unreachable bands drop out on
+        # their own, so no resampling is needed for a balance measurement.
+        ref_db = _band_energies_db(reference, ref_rate)
+        take_db = _band_energies_db(audio_tensor, sample_rate)
+
+        chain: list[dict] = []
+        for b, (lo, hi) in enumerate(TONE_MATCH_BANDS):
+            r, t = ref_db[b], take_db[b]
+            if not (r == r and t == t):  # NaN — this rate cannot measure it
+                continue
+            if r == float("-inf") or r < TONE_MATCH_FLOOR_DB:
+                continue
+            delta = float(r - t)
+            delta = max(-max_gain_db, min(max_gain_db, delta))
+            if abs(delta) < TONE_MATCH_EPSILON_DB:
+                continue  # inaudible; skip the filters entirely
+            chain.extend(_band_filters(lo, hi, delta))
+
+        if not chain:
+            return audio_tensor
+        logger.debug("Tone match: %s", chain)
+        # Applied once. Measuring the result again and correcting a second time
+        # makes it WORSE, not better: the second pass reads a spectrum the first
+        # pass already reshaped and over-corrects into bands it never touched
+        # (measured on a real take: 1 pass = 9.8 dB shape error, 2 = 13.4,
+        # 4 = 17.7). One measured correction, then stop (#3930).
+        return apply_effects_chain(audio_tensor, sample_rate, chain)
+    except Exception as e:  # noqa: BLE001 — cosmetic stage, never fail a take
+        logger.warning("Tone match failed: %s — skipped", e)
+        return audio_tensor
+
+
+def _band_filters(lo: float, hi: float, gain_db: float) -> list[dict]:
+    """Filters that move the whole ``lo..hi`` band by ``gain_db``.
+
+    One bell per band is not enough: a Q=1.1 peak at 5.5 kHz asks for -30 dB
+    and delivers -11 dB, because most of the 3-8 kHz band sits where the bell
+    has already rolled off. A band wider than an octave therefore gets several
+    bells spread across it, and the lowest band (the voice's body, where a peak
+    would eat the fundamental's neighbourhood) gets a shelf instead.
+    """
+    if lo <= 0.0:
+        # The bottom band is a shelf: below the fundamental there is nothing to
+        # protect, and a peak down there would thin the voice out.
+        return [{"type": "eq_low_shelf", "cutoff_hz": hi, "gain_db": gain_db}]
+    if hi >= 16000.0:
+        return [{"type": "eq_high_shelf", "cutoff_hz": lo, "gain_db": gain_db}]
+
+    # One bell per octave, so no part of the band is left behind. The shared
+    # gain is spread by count, keeping the total inside the caller's clamp.
+    octaves = math.log2(hi / lo)
+    count = max(1, min(4, math.ceil(octaves)))
+    if count == 1:
+        return [{"type": "eq_peak", "cutoff_hz": (lo + hi) / 2, "gain_db": gain_db,
+                 "q": _band_q(lo, hi, (lo + hi) / 2)}]
+
+    step = octaves / (count - 1)
+    per_filter = gain_db / count
+    out: list[dict] = []
+    for i in range(count):
+        centre = lo * (2 ** (step * i))
+        q = _band_q(lo, hi, centre)
+        out.append({"type": "eq_peak", "cutoff_hz": centre, "gain_db": per_filter, "q": q})
+    return out
+
+
+def _band_q(lo: float, hi: float, centre: float) -> float:
+    """Peak-filter Q that spans ``lo..hi`` about ``centre``, kept in a sane range."""
+    if centre <= 0 or hi <= lo:
+        return 1.0
+    return max(0.4, min(2.5, centre / (hi - lo)))
+
+
+#: Tone matching is ON by default: a take that keeps a compressed reference's
+#: bandwidth is not something a user would ask for, and the "too high / too
+#: thin" report reproduces on every MP3 reference (#3930). The env var exists
+#: so an A/B comparison against the model's raw output stays one export away.
+TONE_MATCH_PREF = "tone_match"
+TONE_MATCH_ENV = "OMNIVOICE_TONE_MATCH"
+
+
+def tone_match_enabled() -> bool:
+    """Whether takes are tilted toward their reference's bandwidth.
+
+    ``resolve`` reports an unset setting as an empty string, and an unset
+    setting means the default — on.
+    """
+    try:
+        from core import prefs
+
+        value = prefs.resolve(TONE_MATCH_PREF, env=TONE_MATCH_ENV, default="on")
+    except Exception:  # noqa: BLE001 - an unreadable setting keeps the default
+        return True
+    text = str(value or "").strip().lower()
+    if not text:
+        return True
+    return text not in ("off", "0", "false", "no")
 
 
 def normalize_audio(audio_tensor, target_dBFS=-2.0):
@@ -437,6 +662,9 @@ def apply_effects_chain(audio_tensor, sample_rate: int, chain: list[dict]) -> to
         reverb      — room_size, wet_level, dry_level
         noise_gate  — threshold_db, release_ms
         eq          — low_gain_db, mid_gain_db, high_gain_db
+        eq_peak     — cutoff_hz, gain_db, q (single band; see match_reference_tone)
+        eq_low_shelf  — cutoff_hz, gain_db
+        eq_high_shelf — cutoff_hz, gain_db
         limiter     — threshold_db, lookahead_ms, release_ms (see peak_limit)
         leveler     — target_db, window_ms, amount, max_gain_db, smooth_ms
                       (see level_speech)
@@ -516,6 +744,24 @@ def apply_effects_chain(audio_tensor, sample_rate: int, chain: list[dict]) -> to
                     plugins.append(PeakFilter(cutoff_frequency_hz=1500, gain_db=mid, q=1.0))
                 if high:
                     plugins.append(HighShelfFilter(cutoff_frequency_hz=4000, gain_db=high))
+            elif t == "eq_peak":
+                # Single-band filter, used by tone matching (#3930) to move one
+                # measured band without disturbing its neighbours.
+                plugins.append(PeakFilter(
+                    cutoff_frequency_hz=fx.get("cutoff_hz", 1500),
+                    gain_db=fx.get("gain_db", 0.0),
+                    q=fx.get("q", 1.0),
+                ))
+            elif t == "eq_low_shelf":
+                plugins.append(LowShelfFilter(
+                    cutoff_frequency_hz=fx.get("cutoff_hz", 300),
+                    gain_db=fx.get("gain_db", 0.0),
+                ))
+            elif t == "eq_high_shelf":
+                plugins.append(HighShelfFilter(
+                    cutoff_frequency_hz=fx.get("cutoff_hz", 8000),
+                    gain_db=fx.get("gain_db", 0.0),
+                ))
             else:
                 logger.debug("Unknown effect type: %s — skipped", t)
         except Exception as e:

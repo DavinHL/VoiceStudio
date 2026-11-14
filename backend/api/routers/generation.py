@@ -701,9 +701,9 @@ def _sanitize_audio(audio_out):
 
 @_render_timed('effects')
 def _apply_effect_chain(audio_out, sample_rate, effect_preset, *, skip_mastering=False,
-                        trim_edges=False):
+                        trim_edges=False, reference_path=None):
     """Shared post-DSP for /generate: preset validation → edge trim →
-    mastering → effect chain → loudness normalization.
+    mastering → tone match → effect chain → loudness normalization.
 
     ``trim_edges`` is for a finished whole take only: streamed preview chunks
     leave it off so they keep the same timing as the assembled take.
@@ -713,10 +713,15 @@ def _apply_effect_chain(audio_out, sample_rate, effect_preset, *, skip_mastering
     opt out of the broadcast highpass + Compressor pre-stage that's tuned
     for VoiceStudio's 24 kHz clone output. Loudness normalization still runs —
     it's a benign peak scale. Mirrors ``_run_tts`` in openai_compat.py.
+
+    ``reference_path`` enables tone matching (#3930): the take is tilted toward
+    the reference clip's measured band balance, so a compressed reference's
+    muted top end is not replaced by the model's full-band brightness.
     """
     from services.audio_dsp import (
         EFFECT_PRESETS, apply_mastering, normalize_audio,
-        apply_effects_chain, get_effect_chain,
+        apply_effects_chain, get_effect_chain, match_reference_tone,
+        tone_match_enabled,
     )
 
     # #629: a numerical glitch in the model (observed on MPS) can leave NaN/±inf
@@ -743,6 +748,10 @@ def _apply_effect_chain(audio_out, sample_rate, effect_preset, *, skip_mastering
 
     if not skip_mastering:
         audio_out = apply_mastering(audio_out, sample_rate=sample_rate)
+    # Before the preset chain, so a preset the user picked still has the last
+    # word on the final tone. Skipped for a reference the engine already voiced.
+    if reference_path and tone_match_enabled():
+        audio_out = match_reference_tone(audio_out, sample_rate, reference_path)
     chain = get_effect_chain(preset)
     if chain:
         audio_out = apply_effects_chain(
@@ -1355,6 +1364,7 @@ def _run_inference(
         return _apply_effect_chain(
             audio_out, sr, effect_preset,
             trim_edges=not has_pause and _wants_edge_trim(effect_preset, duration),
+            reference_path=ref_audio_path,
         )
 
     except ValueError as e:
@@ -1484,6 +1494,7 @@ def _run_backend_inference(
             audio_out, sr, effect_preset,
             skip_mastering=getattr(backend, "applies_own_mastering", False),
             trim_edges=not has_pause and _wants_edge_trim(effect_preset, duration),
+            reference_path=ref_audio_path,
         )
 
     except ValueError as e:
