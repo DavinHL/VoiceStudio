@@ -7,6 +7,14 @@
 #
 # Why kill from the top: uvicorn re-execs itself, so killing only the process
 # that owns the socket leaves its parents behind and the port is taken again.
+#
+# Before killing, the backend is told the shutdown is deliberate. It keeps a
+# "run sentinel" file for the whole time it runs and retires it on a clean exit;
+# a hard kill leaves the file behind, so the next launch logs
+# "Previous backend run ... ended uncleanly" and files a crash record. The
+# desktop shell avoids that with POST /system/shutdown-intent before it kills
+# the tree, so do the same here. Failing to reach the backend is not an error --
+# it may simply not be up yet.
 
 $ErrorActionPreference = 'SilentlyContinue'
 
@@ -33,6 +41,20 @@ function Get-PortOwners([int[]]$Ports) {
 }
 
 $killed = 0
+
+# Mark the exit as deliberate, so the next start does not report a crash. This
+# is only possible while the backend still answers, which is why it comes first.
+if (Get-PortOwners 3900) {
+    try {
+        $intent = Invoke-RestMethod -Uri 'http://127.0.0.1:3900/system/shutdown-intent' `
+            -Method Post -TimeoutSec 10
+        if ($intent.prepared) {
+            Write-Host "  Told the backend this shutdown is deliberate."
+        }
+    } catch {
+        Write-Host "  Could not mark the shutdown as deliberate (backend not answering)."
+    }
+}
 
 foreach ($attempt in 1..3) {
     $owners = Get-PortOwners 3900, 3901
