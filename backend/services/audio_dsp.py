@@ -192,9 +192,13 @@ def trim_trailing_silence(
 
 
 #: Silence kept before the first voiced sample. A take has to open on its
-#: sound, but cutting flush against the onset clips the first consonant's
-#: attack, so a couple of milliseconds of context stay.
-HEAD_MARGIN_MS = 2
+#: sound, but the onset a take is cut against is *voicing*, and a consonant
+#: gets there through a soft attack: a nasal or a fricative ramps up over tens
+#: of milliseconds, and every sample of that ramp sits below the silence floor
+#: the trim measures against. Cutting at the floor therefore lands part-way up
+#: the first sound, which is heard as a clipped, hard-onsetting opening —
+#: "Hmmm" arrived as a sudden "mmm". 50 ms of context keeps the ramp.
+HEAD_MARGIN_MS = 50
 
 #: Silence kept after the last voiced sample. Generous on purpose: a release
 #: (a final fricative or a breath) decays below the silence floor before it is
@@ -210,6 +214,12 @@ def trim_speech_padding(audio_tensor: torch.Tensor, sample_rate: int) -> torch.T
     a clipped-off opening: every take jumped from -60 dBFS to full level in one
     step, so the first word landed hard and sounded unclear (#3926). The tail
     keeps :data:`TAIL_MARGIN_MS`, because a word's release decays before it ends.
+
+    Both margins exist for the same reason and are now the same length: the
+    silence floor is a poor stand-in for where a sound *starts*. A consonant
+    reaches voicing through an attack that spends its first tens of milli-
+    seconds below the floor, so a tight head trim cuts into the sound itself
+    and the opening word loses its first consonant.
 
     Never compress silence into the spoken slot or delete internal pauses.
     Silent/invalid outputs remain intact for the generation integrity guard.

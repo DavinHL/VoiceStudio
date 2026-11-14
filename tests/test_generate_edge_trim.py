@@ -13,8 +13,8 @@ from api.routers import generation as gen
 from api.routers import openai_compat as oc
 
 SR = 1000  # 1 sample per ms keeps the arithmetic readable
-HEAD = 2  # trim_speech_padding keeps 2 ms of context before the first sound
-TAIL = 50  # ...and 50 ms after the last one, to keep a word's release
+HEAD = dsp.HEAD_MARGIN_MS  # context kept before the first sound
+TAIL = dsp.TAIL_MARGIN_MS  # ...and after the last one, to keep a word's release
 MARGIN = HEAD + TAIL  # total samples a trimmed take keeps around its speech
 
 
@@ -43,6 +43,32 @@ def test_trimmed_take_opens_on_its_sound(no_dsp):
     # Only the head context is silent; the speech starts right after it.
     assert torch.all(out[..., :HEAD] == 0)
     assert torch.all(out[..., HEAD:HEAD + 100] != 0)
+
+
+def test_head_context_outlasts_a_consonant_attack():
+    # The trim is cut against a voicing floor, and a consonant spends its first
+    # tens of milliseconds below that floor. A 2 ms head margin therefore sliced
+    # into the sound itself ("Hmmm" arrived as "mmm"), so the context kept has
+    # to cover a realistic attack, not just the sample that first crosses the
+    # floor.
+    assert dsp.HEAD_MARGIN_MS >= 40
+    # A ramp that climbs from silence crosses the floor 1 ms in (its very first
+    # step is already above -50 dBFS), so the trim can only find the attack if
+    # the retained context reaches back before it.
+    attack, speech, lead = 30, 200, 400
+    ramp = torch.cat([torch.linspace(0, 0.5, attack).unsqueeze(0),
+                      torch.full((1, speech), 0.5)], dim=-1)
+    padded = torch.cat([torch.zeros(1, lead), ramp], dim=-1)
+    out = dsp.trim_speech_padding(padded, SR)
+    # The floor is met at the ramp's first step (lead + 1), so the take opens
+    # HEAD samples before it and keeps the ramp inside that context.
+    assert out.shape[-1] == padded.shape[-1] - (lead + 1 - HEAD)
+    assert torch.all(out[..., :HEAD] == 0)
+    # The attack survives sample for sample, quietest steps included, so the
+    # first sound ramps in instead of starting part-way up. The quietest step
+    # is the ramp's first one, which is the whole point of the wider margin.
+    assert torch.equal(out[..., (lead + 1) - (lead + 1 - HEAD):], padded[..., lead + 1:])
+    assert out[..., HEAD] == ramp[..., 1] < ramp[..., attack - 1]
 
 
 def test_preview_chunks_and_raw_keep_their_edges(no_dsp):
