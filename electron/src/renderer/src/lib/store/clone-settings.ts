@@ -74,7 +74,10 @@ export const DEFAULT_CLONE_SETTINGS: CloneSettings = {
   speed: 1.0,
   tShift: 0.1,
   posTemp: 5.0,
-  classTemp: 0.0,
+  // 1.0 rather than 0.0: the bottom of the range makes every take converge on
+  // the same flat reading, which costs the reference's pitch movement on
+  // anything longer than a clause (#3927).
+  classTemp: 1.0,
   layerPenalty: 5.0,
   denoise: true,
   postprocess: true,
@@ -137,6 +140,25 @@ export function parsePersistedCloneSettings(raw: string | null | undefined): Clo
   return { ...DEFAULT_CLONE_SETTINGS, ...accepted };
 }
 
+/**
+ * The factory value `classTemp` shipped with before the variation default was
+ * raised. A stored 0.0 therefore means "never touched" far more often than it
+ * means a deliberate choice, and leaving it in place would strand every
+ * existing install on the flat end of the range.
+ */
+const LEGACY_CLASS_TEMP = 0.0;
+
+/**
+ * Carry a settings blob written by an older build forward.
+ *
+ * Only the one field whose factory value moved is touched: every other stored
+ * choice is the user's and stays exactly as it was.
+ */
+export function migrateCloneSettings(settings: CloneSettings): CloneSettings {
+  if (settings.classTemp !== LEGACY_CLASS_TEMP) return settings;
+  return { ...settings, classTemp: DEFAULT_CLONE_SETTINGS.classTemp };
+}
+
 function readStorage(): string | null {
   try {
     return typeof localStorage === 'undefined'
@@ -158,7 +180,7 @@ function writeStorage(settings: CloneSettings): void {
 }
 
 export const cloneSettingsStore = new Store<CloneSettings>(
-  parsePersistedCloneSettings(readStorage()),
+  migrateCloneSettings(parsePersistedCloneSettings(readStorage())),
 );
 
 const persist = debounce(writeStorage, { wait: PERSIST_DEBOUNCE_MS });
@@ -166,7 +188,7 @@ cloneSettingsStore.subscribe((settings) => persist(settings));
 // A value pulled by Cloud sync (or written by another window) replaces the in-memory copy,
 // so the next save never writes the old defaults back.
 onStorageKey(CLONE_SETTINGS_STORAGE_KEY, () => {
-  const next = parsePersistedCloneSettings(readStorage());
+  const next = migrateCloneSettings(parsePersistedCloneSettings(readStorage()));
   if (JSON.stringify(next) !== JSON.stringify(cloneSettingsStore.state))
     cloneSettingsStore.setState(() => next);
 });

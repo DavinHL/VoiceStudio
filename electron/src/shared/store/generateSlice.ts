@@ -105,7 +105,7 @@ export const createGenerateSlice: StateCreator<GenerateSlice, [], [], GenerateSl
   cfg: 2.0,
   tShift: 0.1,
   posTemp: 5.0,
-  classTemp: 0.0,
+  classTemp: 1.0,
   layerPenalty: 5.0,
   denoise: true,
   postprocess: true,

@@ -13,7 +13,7 @@ const knobs = [
   { key: 'numStep', label: 'steps', min: 8, max: 64, step: 1, value: 32 },
   { key: 'guidanceScale', label: 'cfg', min: 0, max: 4, step: 0.1, value: 2 },
   { key: 'posTemp', label: 'pos_temp', min: 0, max: 10, step: 0.5, value: 5 },
-  { key: 'classTemp', label: 'class_temp', min: 0, max: 2, step: 0.1, value: 0 },
+  { key: 'classTemp', label: 'class_temp', min: 0, max: 2, step: 0.1, value: 1 },
 ] as const;
 export function ProductionSettings({
   value,

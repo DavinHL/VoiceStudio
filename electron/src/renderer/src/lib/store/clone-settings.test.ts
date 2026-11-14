@@ -89,6 +89,54 @@ describe('parsePersistedCloneSettings', () => {
   });
 });
 
+describe('migrateCloneSettings', () => {
+  it('raises a stored class temperature the old build shipped as its factory value', async () => {
+    const { migrateCloneSettings, DEFAULT_CLONE_SETTINGS, parsePersistedCloneSettings } =
+      await loadModule();
+    const stored = parsePersistedCloneSettings(JSON.stringify({ classTemp: 0, steps: 32 }));
+    expect(migrateCloneSettings(stored)).toMatchObject({
+      classTemp: DEFAULT_CLONE_SETTINGS.classTemp,
+      steps: 32,
+    });
+  });
+
+  it('keeps every other stored choice exactly as it was', async () => {
+    const { migrateCloneSettings, parsePersistedCloneSettings } = await loadModule();
+    const stored = parsePersistedCloneSettings(
+      JSON.stringify({
+        classTemp: 0,
+        posTemp: 2.5,
+        cfg: 3.4,
+        speed: 1.8,
+        steps: 48,
+        effectPreset: 'raw',
+        seed: 99,
+      }),
+    );
+    expect(migrateCloneSettings(stored)).toMatchObject({
+      posTemp: 2.5,
+      cfg: 3.4,
+      speed: 1.8,
+      steps: 48,
+      effectPreset: 'raw',
+      seed: 99,
+    });
+  });
+
+  it('leaves a deliberately non-zero class temperature alone', async () => {
+    const { migrateCloneSettings, parsePersistedCloneSettings } = await loadModule();
+    const stored = parsePersistedCloneSettings(JSON.stringify({ classTemp: 0.4 }));
+    expect(migrateCloneSettings(stored).classTemp).toBe(0.4);
+  });
+
+  it('migrates the value the store hydrates from localStorage', async () => {
+    localStorage.setItem(KEY, JSON.stringify({ classTemp: 0, language: 'French' }));
+    const { cloneSettingsStore, DEFAULT_CLONE_SETTINGS } = await loadModule();
+    expect(cloneSettingsStore.state.classTemp).toBe(DEFAULT_CLONE_SETTINGS.classTemp);
+    expect(cloneSettingsStore.state.language).toBe('French');
+  });
+});
+
 describe('cloneSettingsStore persistence', () => {
   it('hydrates from localStorage on module init', async () => {
     localStorage.setItem(KEY, JSON.stringify({ language: 'French', showOverrides: true }));
