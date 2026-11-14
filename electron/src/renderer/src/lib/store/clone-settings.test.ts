@@ -90,10 +90,10 @@ describe('parsePersistedCloneSettings', () => {
 });
 
 describe('migrateCloneSettings', () => {
-  it('raises a stored class temperature the old build shipped as its factory value', async () => {
+  it('undoes the raised class temperature an older build shipped as its default', async () => {
     const { migrateCloneSettings, DEFAULT_CLONE_SETTINGS, parsePersistedCloneSettings } =
       await loadModule();
-    const stored = parsePersistedCloneSettings(JSON.stringify({ classTemp: 0, steps: 32 }));
+    const stored = parsePersistedCloneSettings(JSON.stringify({ classTemp: 1, steps: 32 }));
     expect(migrateCloneSettings(stored)).toMatchObject({
       classTemp: DEFAULT_CLONE_SETTINGS.classTemp,
       steps: 32,
@@ -104,7 +104,7 @@ describe('migrateCloneSettings', () => {
     const { migrateCloneSettings, parsePersistedCloneSettings } = await loadModule();
     const stored = parsePersistedCloneSettings(
       JSON.stringify({
-        classTemp: 0,
+        classTemp: 1,
         posTemp: 2.5,
         cfg: 3.4,
         speed: 1.8,
@@ -123,14 +123,20 @@ describe('migrateCloneSettings', () => {
     });
   });
 
-  it('leaves a deliberately non-zero class temperature alone', async () => {
+  it('leaves a deliberately non-default class temperature alone', async () => {
     const { migrateCloneSettings, parsePersistedCloneSettings } = await loadModule();
     const stored = parsePersistedCloneSettings(JSON.stringify({ classTemp: 0.4 }));
     expect(migrateCloneSettings(stored).classTemp).toBe(0.4);
   });
 
+  it('leaves the new default class temperature alone', async () => {
+    const { migrateCloneSettings, parsePersistedCloneSettings } = await loadModule();
+    const stored = parsePersistedCloneSettings(JSON.stringify({ classTemp: 0 }));
+    expect(migrateCloneSettings(stored).classTemp).toBe(0);
+  });
+
   it('migrates the value the store hydrates from localStorage', async () => {
-    localStorage.setItem(KEY, JSON.stringify({ classTemp: 0, language: 'French' }));
+    localStorage.setItem(KEY, JSON.stringify({ classTemp: 1, language: 'French' }));
     const { cloneSettingsStore, DEFAULT_CLONE_SETTINGS } = await loadModule();
     expect(cloneSettingsStore.state.classTemp).toBe(DEFAULT_CLONE_SETTINGS.classTemp);
     expect(cloneSettingsStore.state.language).toBe('French');

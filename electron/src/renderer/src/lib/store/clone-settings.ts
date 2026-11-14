@@ -74,10 +74,10 @@ export const DEFAULT_CLONE_SETTINGS: CloneSettings = {
   speed: 1.0,
   tShift: 0.1,
   posTemp: 5.0,
-  // 1.0 rather than 0.0: the bottom of the range makes every take converge on
-  // the same flat reading, which costs the reference's pitch movement on
-  // anything longer than a clause (#3927).
-  classTemp: 1.0,
+  // 0.0 keeps a take on the reference's own reading. Raising it sampled
+  // different output on every take, which users hear as the voice drifting
+  // bright and thin and then coming back (#3927, #3931).
+  classTemp: 0.0,
   layerPenalty: 5.0,
   denoise: true,
   postprocess: true,
@@ -141,21 +141,21 @@ export function parsePersistedCloneSettings(raw: string | null | undefined): Clo
 }
 
 /**
- * The factory value `classTemp` shipped with before the variation default was
- * raised. A stored 0.0 therefore means "never touched" far more often than it
- * means a deliberate choice, and leaving it in place would strand every
- * existing install on the flat end of the range.
+ * The variation default this build restored. A stored value is a deliberate
+ * choice and is kept; a raise that is no longer the default is undone, because
+ * leaving it in place would strand an install on the setting users reported as
+ * the voice drifting (#3931).
  */
-const LEGACY_CLASS_TEMP = 0.0;
+const RETIRED_CLASS_TEMP = 1.0;
 
 /**
  * Carry a settings blob written by an older build forward.
  *
- * Only the one field whose factory value moved is touched: every other stored
+ * Only the one field whose default moved is touched: every other stored
  * choice is the user's and stays exactly as it was.
  */
 export function migrateCloneSettings(settings: CloneSettings): CloneSettings {
-  if (settings.classTemp !== LEGACY_CLASS_TEMP) return settings;
+  if (settings.classTemp !== RETIRED_CLASS_TEMP) return settings;
   return { ...settings, classTemp: DEFAULT_CLONE_SETTINGS.classTemp };
 }
 
