@@ -714,14 +714,16 @@ def _apply_effect_chain(audio_out, sample_rate, effect_preset, *, skip_mastering
     for VoiceStudio's 24 kHz clone output. Loudness normalization still runs —
     it's a benign peak scale. Mirrors ``_run_tts`` in openai_compat.py.
 
-    ``reference_path`` enables tone matching (#3930): the take is tilted toward
-    the reference clip's measured band balance, so a compressed reference's
-    muted top end is not replaced by the model's full-band brightness.
+    ``reference_path`` enables reference matching: the take is tilted toward the
+    reference clip's measured band balance (#3930) and brought to its loudness
+    (#3932), so a compressed reference's muted top end is not replaced by the
+    model's full-band brightness, and a dynamic reference is not replaced by a
+    take that is 10 dB louder and compressed against the limiter.
     """
     from services.audio_dsp import (
         EFFECT_PRESETS, apply_mastering, normalize_audio,
         apply_effects_chain, get_effect_chain, match_reference_tone,
-        tone_match_enabled,
+        tone_match_enabled, match_reference_level, level_match_enabled,
     )
 
     # #629: a numerical glitch in the model (observed on MPS) can leave NaN/±inf
@@ -757,6 +759,12 @@ def _apply_effect_chain(audio_out, sample_rate, effect_preset, *, skip_mastering
         audio_out = apply_effects_chain(
             audio_out, sample_rate=sample_rate, chain=chain,
         )
+    # After the chain, so the level the user hears is the one that lands on the
+    # reference — the chain's own leveler is one of the stages that made the
+    # take loud in the first place (#3932). Peak normalisation stays as the
+    # fallback for a take with no reference to copy a level from.
+    if reference_path and level_match_enabled():
+        return match_reference_level(audio_out, sample_rate, reference_path)
     return normalize_audio(audio_out, target_dBFS=-2.0)
 
 

@@ -240,7 +240,8 @@ def match_reference_tone(
     spills into its neighbours and delivers a fraction of what it is asked for.
 
     Only the *shape* is copied — the overall level is left to
-    :func:`normalize_audio`. Bands the reference cannot measure (below
+    :func:`match_reference_level` (or :func:`normalize_audio` with no reference).
+    Bands the reference cannot measure (below
     :data:`TONE_MATCH_FLOOR_DB`, or above its own Nyquist) are skipped, and every
     band is clamped to ``max_gain_db``. Any failure returns the input unchanged:
     a take must never be lost to a cosmetic stage.
@@ -328,6 +329,95 @@ def _band_q(lo: float, hi: float, centre: float) -> float:
     return max(0.4, min(2.5, centre / (hi - lo)))
 
 
+#: Most a level match may raise the take. The reference is the user's own clip,
+#: so its loudness is the target they picked — but a reference recorded very
+#: quietly must not drag the take up into the limiter, which is the failure this
+#: stage exists to undo in the first place.
+LEVEL_MATCH_MAX_GAIN_DB = 6.0
+
+#: Loudness floor, matching :func:`normalize_audio`'s silence guard. A reference
+#: that is effectively silent has no level worth copying.
+LEVEL_MATCH_FLOOR_DB = -50.0
+
+
+def _rms_db(audio_tensor: torch.Tensor) -> float:
+    """Level of ``audio_tensor`` as the RMS in dBFS, or ``-inf`` for silence."""
+    if audio_tensor.numel() == 0:
+        return float("-inf")
+    power = torch.mean(audio_tensor.to(torch.float64) ** 2)
+    rms = float(torch.sqrt(power))
+    if rms <= 0.0:
+        return float("-inf")
+    return 20.0 * math.log10(rms)
+
+
+def match_reference_level(
+    audio_tensor: torch.Tensor,
+    sample_rate: int,
+    reference_path: str | None,
+    *,
+    max_gain_db: float = LEVEL_MATCH_MAX_GAIN_DB,
+    peak_ceiling_dbfs: float = -3.0,
+) -> torch.Tensor:
+    """Match a take's loudness to its reference's loudness (#3932).
+
+    Peak normalisation says nothing about how loud a take *feels*: a dense,
+    compressed take and a dynamic reference can share a peak and still sit 8 dB
+    apart, which is what "the generated voice sounds loud and hard" actually
+    describes. Perceived loudness tracks RMS, so the reference's RMS is copied
+    instead — it is already the clip the user chose as the voice.
+
+    Two guards keep the copy honest:
+
+    * ``max_gain_db`` caps how far the take may be raised. A reference recorded
+      very quietly would otherwise push the take straight into the limiter.
+    * ``peak_ceiling_dbfs`` caps the result, so a take that is far more dynamic
+      than its reference does not clip on the way up. Attenuation (a take louder
+      than its reference) is never limited — coming down is always safe, and
+      that is the direction the reports come from.
+
+    Any failure returns the input unchanged: a take must never be lost to a
+    cosmetic stage.
+    """
+    if reference_path is None or audio_tensor.numel() == 0:
+        return audio_tensor
+    try:
+        from services.audio_io import load_audio
+
+        reference, _ = load_audio(reference_path)
+        if reference is None or reference.numel() == 0:
+            return audio_tensor
+
+        ref_db = _rms_db(reference)
+        take_db = _rms_db(audio_tensor)
+        if ref_db <= LEVEL_MATCH_FLOOR_DB or take_db <= LEVEL_MATCH_FLOOR_DB:
+            return audio_tensor
+
+        gain_db = min(ref_db - take_db, max_gain_db)
+        if abs(gain_db) < 0.1:
+            return audio_tensor
+
+        scaled = audio_tensor * (10.0 ** (gain_db / 20.0))
+
+        # Only the upward direction can clip: a positive gain that lands the
+        # peak above the ceiling is pulled back to fit, trading a little of the
+        # loudness match for headroom.
+        peak = float(torch.abs(scaled).max())
+        if peak > 0.0:
+            peak_db = 20.0 * math.log10(peak)
+            if peak_db > peak_ceiling_dbfs:
+                scaled = scaled * (10.0 ** ((peak_ceiling_dbfs - peak_db) / 20.0))
+
+        logger.debug(
+            "Level match: reference %.2f dB, take %.2f dB, gain %+.2f dB",
+            ref_db, take_db, gain_db,
+        )
+        return scaled
+    except Exception as e:  # noqa: BLE001 — cosmetic stage, never fail a take
+        logger.warning("Level match failed: %s — skipped", e)
+        return audio_tensor
+
+
 #: Tone matching is ON by default: a take that keeps a compressed reference's
 #: bandwidth is not something a user would ask for, and the "too high / too
 #: thin" report reproduces on every MP3 reference (#3930). The env var exists
@@ -346,6 +436,27 @@ def tone_match_enabled() -> bool:
         from core import prefs
 
         value = prefs.resolve(TONE_MATCH_PREF, env=TONE_MATCH_ENV, default="on")
+    except Exception:  # noqa: BLE001 - an unreadable setting keeps the default
+        return True
+    text = str(value or "").strip().lower()
+    if not text:
+        return True
+    return text not in ("off", "0", "false", "no")
+
+
+#: Level matching is ON by default for the same reason tone matching is: the
+#: reference is the clip the user picked, and a take that is 10 dB louder than
+#: it does not read as the same voice (#3932). Shares the env-var A/B escape.
+LEVEL_MATCH_PREF = "level_match"
+LEVEL_MATCH_ENV = "OMNIVOICE_LEVEL_MATCH"
+
+
+def level_match_enabled() -> bool:
+    """Whether takes are brought to their reference's loudness."""
+    try:
+        from core import prefs
+
+        value = prefs.resolve(LEVEL_MATCH_PREF, env=LEVEL_MATCH_ENV, default="on")
     except Exception:  # noqa: BLE001 - an unreadable setting keeps the default
         return True
     text = str(value or "").strip().lower()
