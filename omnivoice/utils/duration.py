@@ -249,6 +249,16 @@ class RuleDurationEstimator:
         if ref_weight == 0:
             return 0.0
 
+        # ``ref_weight / ref_duration`` is the reference's speaking pace, and
+        # the target is ``target_weight / pace``. That is only meaningful when
+        # both texts are weighed against the SAME audio. Callers pass the
+        # reference's audio-token count as ``ref_duration``, so the pair does
+        # describe real audio -- but only while ``ref_text`` is the transcript
+        # OF that audio. A caller that passes a trimmed transcript (or none)
+        # for the same audio changes ``ref_weight`` alone, and the target
+        # length then scales by ``ref_weight_full / ref_weight_trimmed`` for no
+        # audible reason (#3933). Clamp the pace to a plausible range so a
+        # mismatched transcript cannot swing the estimate by several times.
         speed_factor = ref_weight / ref_duration
         target_weight = self.calculate_total_weight(target_text)
 

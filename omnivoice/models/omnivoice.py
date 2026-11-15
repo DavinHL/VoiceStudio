@@ -61,6 +61,8 @@ from omnivoice.utils.audio import (
     CLONE_REF_TEXT_MAX_SECONDS,
     CLONE_REF_TOO_LONG_MARKER,
     CLONE_REF_WINDOW_SECONDS,
+    MAX_REFERENCE_PACE,
+    MIN_REFERENCE_PACE,
     check_reference_encode_memory,
     clone_ref_transcript_too_long_message,
     cross_fade_chunks,
@@ -113,6 +115,10 @@ class VoiceClonePrompt:
     ref_audio_tokens: torch.Tensor  # (C, T)
     ref_text: str
     ref_rms: float
+    # Seconds of the reference clip the tokens came from. The target length is
+    # derived from the reference's pace, and that pace has to span the SAME
+    # audio the tokens describe — see ``_target_tokens_from_reference``.
+    ref_seconds: float = 0.0
 
     def save(self, path: str) -> None:
         """Save this prompt to ``path`` for reuse in a later session.
@@ -130,6 +136,7 @@ class VoiceClonePrompt:
                 "ref_audio_tokens": self.ref_audio_tokens.detach().cpu(),
                 "ref_text": self.ref_text,
                 "ref_rms": float(self.ref_rms),
+                "ref_seconds": float(self.ref_seconds),
             },
             path,
         )
@@ -157,6 +164,9 @@ class VoiceClonePrompt:
             ref_audio_tokens=data["ref_audio_tokens"],
             ref_text=data["ref_text"],
             ref_rms=data["ref_rms"],
+            # Prompts written before this field existed carry no duration; the
+            # caller then falls back to the token-count pace.
+            ref_seconds=float(data.get("ref_seconds", 0.0)),
         )
 
 
@@ -192,6 +202,7 @@ class GenerationTask:
     ref_audio_tokens: List[Optional[torch.Tensor]]
     ref_rms: List[Optional[float]]
     speed: Optional[List[float]] = None
+    ref_seconds: Optional[List[Optional[float]]] = None
 
     def get_indices(self, config: OmniVoiceGenerationConfig, frame_rate: int):
         threshold = int(config.audio_chunk_threshold * frame_rate)
@@ -1224,6 +1235,7 @@ class OmniVoice(PreTrainedModel):
             ref_audio_tokens=ref_audio_tokens,
             ref_text=ref_text,
             ref_rms=selected_ref_rms,
+            ref_seconds=ref_wav.size(-1) / self.sampling_rate,
         )
 
     def _decode_and_post_process(
@@ -1487,10 +1499,14 @@ class OmniVoice(PreTrainedModel):
                 vc.ref_audio_tokens for vc in voice_clone_prompt_list
             ]
             ref_rms_list = [vc.ref_rms for vc in voice_clone_prompt_list]
+            ref_seconds_list = [
+                vc.ref_seconds or None for vc in voice_clone_prompt_list
+            ]
         else:
             ref_text_list = [None] * batch_size
             ref_audio_tokens_list = [None] * batch_size
             ref_rms_list = [None] * batch_size
+            ref_seconds_list = [None] * batch_size
 
         # Normalize speed/duration to per-item lists (may contain None).
         if speed is not None:
@@ -1515,12 +1531,13 @@ class OmniVoice(PreTrainedModel):
             # to get the raw estimate, then override target_lens below.
             has_dur = durations is not None and durations[i] is not None
             item_speed = 1.0 if has_dur else (user_speed[i] if user_speed else 1.0)
-            est = self._estimate_target_tokens(
+            est = self._target_tokens_from_reference(
                 text_list[i],
                 ref_text_list[i],
                 ref_audio_tokens_list[i].size(-1)
                 if ref_audio_tokens_list[i] is not None
                 else None,
+                ref_seconds=ref_seconds_list[i],
                 speed=item_speed,
             )
             num_target_tokens_list.append(est)
@@ -1553,6 +1570,7 @@ class OmniVoice(PreTrainedModel):
             ref_audio_tokens=ref_audio_tokens_list,
             ref_rms=ref_rms_list,
             speed=speed_list,
+            ref_seconds=ref_seconds_list,
         )
 
     def _estimate_target_tokens(self, text, ref_text, num_ref_audio_tokens, speed=1.0):
@@ -1570,6 +1588,81 @@ class OmniVoice(PreTrainedModel):
         est = self.duration_estimator.estimate_duration(
             text, ref_text, num_ref_audio_tokens, low_threshold=2.0
         )
+        if speed > 0 and speed != 1.0:
+            est = est / speed
+        return max(1, int(est))
+
+    def _target_tokens_from_reference(
+        self, text, ref_text, num_ref_audio_tokens, ref_seconds=None, speed=1.0
+    ):
+        """Estimate target audio tokens from the reference's own speaking pace.
+
+        The reference's pace is the anchor for how long the target may be, and
+        it has to be measured over the SAME audio the reference tokens
+        describe. ``estimate_duration`` instead divides by ``ref_weight /
+        ref_duration``, which is that pace only while ``ref_text`` is the
+        transcript of the whole clip. A shorter transcript — a trim, a
+        paraphrase, or the ``"Nice to meet you."`` fallback — lowers
+        ``ref_weight`` without changing the audio, so the pace looks slower and
+        the target is scaled up by the same factor.
+
+        Measured on a 13.61 s reference speaking 173 characters, with a
+        42-character target:
+
+        * the full transcript is 173 characters over that 13.61 s, i.e. 12.71
+          characters/s, so 42 characters need 3.30 s — 248 frames, and the
+          take landed at 14.11 weight/s against the reference's 14.34, correct;
+        * the same audio described by a 46-character trim implies 2.92
+          characters/s, which asks for 1080 frames — 3.3x too long, and the
+          render read at 6.48 weight/s, roughly half speed (#3933).
+
+        Anchoring the pace to the clip's real duration keeps the first case
+        exact. The second case cannot be made exact, because a transcript that
+        does not describe its audio really does imply a slower pace; the clamp
+        bounds it to a plausible reading range so it renders long-but-sane
+        instead of several times over. When ``ref_seconds`` is unknown (a
+        prompt saved before this field existed) the older token-count ratio
+        still applies unchanged.
+        """
+        if num_ref_audio_tokens is None or num_ref_audio_tokens <= 0:
+            return self._estimate_target_tokens(
+                text, ref_text, num_ref_audio_tokens, speed=speed
+            )
+        target_weight = self.duration_estimator.calculate_total_weight(text)
+        if target_weight <= 0:
+            return self._estimate_target_tokens(
+                text, ref_text, num_ref_audio_tokens, speed=speed
+            )
+
+        ref_weight = self.duration_estimator.calculate_total_weight(ref_text or "")
+        span_seconds = ref_seconds
+        if not span_seconds or span_seconds <= 0:
+            frame_rate = self.audio_tokenizer.config.frame_rate
+            if not frame_rate or frame_rate <= 0:
+                return self._estimate_target_tokens(
+                    text, ref_text, num_ref_audio_tokens, speed=speed
+                )
+            span_seconds = num_ref_audio_tokens / frame_rate
+        if ref_weight <= 0 or span_seconds <= 0:
+            return self._estimate_target_tokens(
+                text, ref_text, num_ref_audio_tokens, speed=speed
+            )
+
+        frame_rate = self.audio_tokenizer.config.frame_rate
+        if not frame_rate or frame_rate <= 0:
+            return self._estimate_target_tokens(
+                text, ref_text, num_ref_audio_tokens, speed=speed
+            )
+
+        pace = ref_weight / span_seconds
+        # Measured speech lands in this range: the reference reads at 11.03
+        # weight/s over its full length and 14.34 over the voiced part, while
+        # the half-speed take reads at 3.60. Clamping keeps a transcript that
+        # does not match its audio from asking for a several-times-longer
+        # render, without pinning every speaker to one pace.
+        pace = max(MIN_REFERENCE_PACE, min(MAX_REFERENCE_PACE, pace))
+
+        est = target_weight / pace * frame_rate
         if speed > 0 and speed != 1.0:
             est = est / speed
         return max(1, int(est))

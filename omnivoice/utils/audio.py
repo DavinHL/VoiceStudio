@@ -56,6 +56,18 @@ CLONE_REF_MAX_WINDOWS = 5
 # so it neither starts nor ends mid-word.
 CLONE_REF_EDGE_SEARCH_SECONDS = 1.5
 
+# Plausible speaking pace for the target-length estimate (#3933), in character
+# weight per second of reference audio. A transcript that does not describe its
+# audio implies an impossible pace — a 46-character trim of a 13.61 s clip reads
+# as 2.92 weight/s — and the target length scales inversely, so the render came
+# out 3.3x too long at half speed. Measured on this project's references: full
+# transcripts read at 11.03 weight/s over the whole clip and 14.34 over the
+# voiced part, while the half-speed render read at 3.60. The bounds sit around
+# the measured range rather than at its edge, so a genuinely slow or fast
+# speaker still moves the estimate.
+MIN_REFERENCE_PACE = 4.0
+MAX_REFERENCE_PACE = 24.0
+
 
 def trim_passage_to_pauses(
     wav: torch.Tensor,
