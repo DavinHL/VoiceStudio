@@ -68,6 +68,15 @@ CLONE_REF_EDGE_SEARCH_SECONDS = 1.5
 MIN_REFERENCE_PACE = 4.0
 MAX_REFERENCE_PACE = 24.0
 
+# Fewest audio frames the decoder can render one character-weight unit of text in
+# (#3934). A starved target does not render fast — it fails outright, coming out
+# as a near-pure tone around 620 Hz with no energy below 300 Hz. Measured on a
+# 42-character target (weight 36.4): 225 frames -> artifact, 300 -> artifact,
+# 375 -> normal speech. That puts the boundary near 8-10 frames per weight unit,
+# so the floor is set just above it. This is a floor only; a reference that
+# genuinely reads slowly may still ask for far more (MAX_REFERENCE_PACE caps it).
+MIN_FRAMES_PER_WEIGHT = 10.0
+
 
 def trim_passage_to_pauses(
     wav: torch.Tensor,

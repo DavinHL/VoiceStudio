@@ -17,7 +17,11 @@ import types
 import pytest
 
 from omnivoice.models.omnivoice import OmniVoice
-from omnivoice.utils.audio import MAX_REFERENCE_PACE, MIN_REFERENCE_PACE
+from omnivoice.utils.audio import (
+    MAX_REFERENCE_PACE,
+    MIN_FRAMES_PER_WEIGHT,
+    MIN_REFERENCE_PACE,
+)
 from omnivoice.utils.duration import RuleDurationEstimator
 
 # The tokenizer's real configuration (downsample_factor 320 at 24 kHz).
@@ -34,6 +38,15 @@ _TRIMMED_TRANSCRIPT = "Airoh, kalau begitu aku akan membantumu, Pong."
 _TEXT = "helo aku siapa pong airoh kamu dimana pong"
 
 
+def _weight(text):
+    return RuleDurationEstimator().calculate_total_weight(text)
+
+
+def _floor_for(text):
+    """The fewest frames the decoder can render ``text`` in (#3934)."""
+    return int(_weight(text) * MIN_FRAMES_PER_WEIGHT)
+
+
 class _Estimator:
     """The two attributes ``_target_tokens_from_reference`` actually reads."""
 
@@ -45,6 +58,7 @@ class _Estimator:
 
     _target_tokens_from_reference = OmniVoice._target_tokens_from_reference
     _estimate_target_tokens = OmniVoice._estimate_target_tokens
+    _minimum_target_tokens = OmniVoice._minimum_target_tokens
 
 
 def _tokens(text, ref_text, ref_seconds=_REF_SECONDS, speed=1.0):
@@ -69,7 +83,19 @@ class TestReferencePace:
     def test_the_full_transcript_gets_the_length_its_audio_implies(self):
         """With a transcript that matches its audio, the estimate follows the
         measured pace — this is the path that must stay exactly right."""
-        assert _tokens(_TEXT, _FULL_TRANSCRIPT) == 247
+        tokens = _tokens(_TEXT, _FULL_TRANSCRIPT)
+        # 36.4 weight at the reference's 12.71 chars/s pace asks for ~247
+        # frames, which is below what the decoder needs to render the text at
+        # all (#3934), so the floor lifts it.
+        assert tokens == _floor_for(_TEXT)
+        assert tokens > 247
+
+    def test_the_length_never_falls_below_what_the_text_needs(self):
+        """A starved target does not come out fast — it comes out as a tone
+        (#3934). Every path must clear the floor, whatever the reference's
+        measured pace."""
+        assert _tokens(_TEXT, _FULL_TRANSCRIPT) >= _floor_for(_TEXT)
+        assert _tokens(_TEXT, _TRIMMED_TRANSCRIPT) >= _floor_for(_TEXT)
 
     def test_the_length_matches_the_reference_reading_pace(self):
         """A 13.61 s clip reading 173 characters is 12.71 characters/s, so a
@@ -77,15 +103,18 @@ class TestReferencePace:
         ratio asks for, and not the 12.5 s the old path asked for."""
         tokens = _tokens(_TEXT, _FULL_TRANSCRIPT)
         seconds = tokens / _FRAME_RATE
-        expected = len(_TEXT) / (len(_FULL_TRANSCRIPT) / _REF_SECONDS)
+        expected = _floor_for(_TEXT) / _FRAME_RATE
         assert seconds == pytest.approx(expected, abs=0.35)
 
     def test_a_slower_reference_asks_for_a_longer_target(self):
         """The pace is measured, not pinned: a reference that takes twice as
-        long to say the same words must produce a longer target."""
-        fast = _tokens(_TEXT, _FULL_TRANSCRIPT, ref_seconds=_REF_SECONDS)
-        slow = _tokens(_TEXT, _FULL_TRANSCRIPT, ref_seconds=_REF_SECONDS * 2)
-        assert slow > fast * 1.8
+        long to say the same words must produce a longer target. The baseline
+        sits on the floor (#3934), so compare from a reference slow enough to
+        clear it — 27.2 s asks 495 frames, 54.4 s asks 682 (the pace clamp
+        stops it growing further)."""
+        normal = _tokens(_TEXT, _FULL_TRANSCRIPT, ref_seconds=_REF_SECONDS * 2)
+        slower = _tokens(_TEXT, _FULL_TRANSCRIPT, ref_seconds=_REF_SECONDS * 4)
+        assert slower > normal
 
     def test_longer_target_text_asks_for_more_frames(self):
         short = _tokens("hello", _FULL_TRANSCRIPT)
@@ -102,7 +131,6 @@ class TestClamp:
         # Without the clamp this would be 42 / (39.7/13.61) * 75 = ~1080 frames.
         assert tokens < 42 / (39.7 / _REF_SECONDS) * _FRAME_RATE
         assert tokens / _FRAME_RATE < 10.0
-
     def test_the_clamp_bounds_the_pace_at_both_ends(self):
         """An absurdly long transcript must not shrink the render to nothing
         either."""
@@ -114,7 +142,7 @@ class TestClamp:
             / MAX_REFERENCE_PACE
             * _FRAME_RATE
         )
-        assert tokens == pytest.approx(expected, rel=0.02)
+        assert tokens == pytest.approx(max(expected, _floor_for(_TEXT)), rel=0.02)
         assert tokens >= 1
 
     def test_the_bounds_sit_around_measured_speech(self):
@@ -133,7 +161,7 @@ class TestFallbacks:
         must keep working rather than erroring."""
         est = _Estimator()
         tokens = est._target_tokens_from_reference(_TEXT, _FULL_TRANSCRIPT, _REF_TOKENS)
-        assert tokens > 1
+        assert tokens >= _floor_for(_TEXT)
 
     def test_without_any_reference_the_plain_estimator_is_used(self):
         est = _Estimator()
@@ -143,21 +171,27 @@ class TestFallbacks:
     def test_an_empty_reference_text_falls_back(self):
         est = _Estimator()
         tokens = est._target_tokens_from_reference(_TEXT, "", 0, ref_seconds=_REF_SECONDS)
-        assert tokens > 1
+        assert tokens >= _floor_for(_TEXT)
 
     def test_an_unknown_frame_rate_falls_back_without_raising(self):
         est = _Estimator(frame_rate=0)
         tokens = est._target_tokens_from_reference(
             _TEXT, _FULL_TRANSCRIPT, _REF_TOKENS, ref_seconds=_REF_SECONDS
         )
-        assert tokens > 1
+        assert tokens >= _floor_for(_TEXT)
 
     def test_speed_still_scales_the_result(self):
-        normal = _tokens(_TEXT, _FULL_TRANSCRIPT)
-        faster = _tokens(_TEXT, _FULL_TRANSCRIPT, speed=2.0)
-        slower = _tokens(_TEXT, _FULL_TRANSCRIPT, speed=0.5)
-        assert faster == pytest.approx(normal / 2, rel=0.02)
+        """Above the floor, speed scales as before. A slow reference clears the
+        floor, so the scaling is visible rather than masked by it (#3934)."""
+        normal = _tokens(_TEXT, _FULL_TRANSCRIPT, ref_seconds=_REF_SECONDS * 2)
+        slower = _tokens(_TEXT, _FULL_TRANSCRIPT, ref_seconds=_REF_SECONDS * 2, speed=0.5)
         assert slower == pytest.approx(normal * 2, rel=0.02)
+
+    def test_a_faster_request_is_still_held_at_the_floor(self):
+        """Speeding a starved target up cannot push it below what the text
+        needs, so the floor wins — this is the point of the floor (#3934)."""
+        faster = _tokens(_TEXT, _FULL_TRANSCRIPT, speed=2.0)
+        assert faster == _floor_for(_TEXT)
 
     def test_the_result_is_always_at_least_one_frame(self):
         assert _tokens("a", _FULL_TRANSCRIPT) >= 1

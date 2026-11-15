@@ -62,6 +62,7 @@ from omnivoice.utils.audio import (
     CLONE_REF_TOO_LONG_MARKER,
     CLONE_REF_WINDOW_SECONDS,
     MAX_REFERENCE_PACE,
+    MIN_FRAMES_PER_WEIGHT,
     MIN_REFERENCE_PACE,
     check_reference_encode_memory,
     clone_ref_transcript_too_long_message,
@@ -1590,7 +1591,13 @@ class OmniVoice(PreTrainedModel):
         )
         if speed > 0 and speed != 1.0:
             est = est / speed
-        return max(1, int(est))
+        # The estimate can land below what the decoder needs to render the text
+        # at all, which produces a tone rather than speech (#3934). See
+        # ``_minimum_target_tokens``.
+        floor = self._minimum_target_tokens(
+            self.duration_estimator.calculate_total_weight(text)
+        )
+        return max(floor, int(est))
 
     def _target_tokens_from_reference(
         self, text, ref_text, num_ref_audio_tokens, ref_seconds=None, speed=1.0
@@ -1665,7 +1672,30 @@ class OmniVoice(PreTrainedModel):
         est = target_weight / pace * frame_rate
         if speed > 0 and speed != 1.0:
             est = est / speed
-        return max(1, int(est))
+        return max(self._minimum_target_tokens(target_weight), int(est))
+
+    def _minimum_target_tokens(self, target_weight: float) -> int:
+        """Fewest frames the decoder can render ``target_weight`` of text in.
+
+        A starved target does not come out fast — it fails outright. Measured on
+        a 42-character target (weight 36.4) with a reference whose stored
+        transcript reads at 11.02 weight/s: the estimate asked for 247 frames
+        and the render was a near-pure tone at ~620 Hz with no energy below
+        300 Hz at all (YIN reports 666.7 Hz, but it is not a voice). Forcing a
+        longer target on the SAME reference and text fixed it outright:
+
+        * 225 frames (3 s) -> 0.2% below 300 Hz, artifact
+        * 300 frames (4 s) -> 1.7%, artifact
+        * 375 frames (5 s) -> 17.9%, normal speech
+
+        So the floor sits between 300 and 375 frames for weight 36.4, i.e.
+        roughly 9 frames per weight unit. ``MIN_FRAMES_PER_WEIGHT`` is set just
+        above the measured boundary so a starved estimate is lifted into the
+        range that actually decodes, while a reference that legitimately reads
+        slowly is still allowed to ask for far more (the pace clamp is the
+        ceiling, this is only a floor).
+        """
+        return max(1, int(target_weight * MIN_FRAMES_PER_WEIGHT))
 
     def _ensure_list(
         self, x: Union[Any, List[Any]], batch_size: int, auto_repeat: bool = True
