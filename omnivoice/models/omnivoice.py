@@ -1679,21 +1679,20 @@ class OmniVoice(PreTrainedModel):
 
         A starved target does not come out fast — it fails outright. Measured on
         a 42-character target (weight 36.4) with a reference whose stored
-        transcript reads at 11.02 weight/s: the estimate asked for 247 frames
-        and the render was a near-pure tone at ~620 Hz with no energy below
-        300 Hz at all (YIN reports 666.7 Hz, but it is not a voice). Forcing a
-        longer target on the SAME reference and text fixed it outright:
+        transcript reads at 11.02 weight/s, forcing specific frame counts on the
+        SAME reference and text:
 
-        * 225 frames (3 s) -> 0.2% below 300 Hz, artifact
-        * 300 frames (4 s) -> 1.7%, artifact
-        * 375 frames (5 s) -> 17.9%, normal speech
+        * 225 frames -> 648.6 Hz, +21.8 semitones, a pure tone
+        * 300 frames -> 358.2 Hz, +11.5 semitones, still an artifact
+        * 375 frames -> 196.7 Hz, +1.1 semitones, normal speech
+        * 450 frames -> 240.0 Hz, +4.5
+        * 600 frames -> 163.8 Hz, -2.1
 
-        So the floor sits between 300 and 375 frames for weight 36.4, i.e.
-        roughly 9 frames per weight unit. ``MIN_FRAMES_PER_WEIGHT`` is set just
-        above the measured boundary so a starved estimate is lifted into the
-        range that actually decodes, while a reference that legitimately reads
-        slowly is still allowed to ask for far more (the pace clamp is the
-        ceiling, this is only a floor).
+        Below 375 the pitch flies off the scale; above it, pitch stops tracking
+        frame count (the remaining scatter is a separate, unsolved variation).
+        So this is a cliff guard rather than a pitch control, and it is set with
+        margin above the measured edge. ``MAX_REFERENCE_PACE`` remains the
+        ceiling — a reference that legitimately reads slowly still asks for more.
         """
         return max(1, int(target_weight * MIN_FRAMES_PER_WEIGHT))
 

@@ -85,10 +85,10 @@ class TestReferencePace:
         measured pace — this is the path that must stay exactly right."""
         tokens = _tokens(_TEXT, _FULL_TRANSCRIPT)
         # 36.4 weight at the reference's 12.71 chars/s pace asks for ~247
-        # frames, which is below what the decoder needs to render the text at
-        # all (#3934), so the floor lifts it.
+        # frames, which is below the cliff where the decoder stops rendering
+        # speech at all (#3934), so the floor lifts it.
         assert tokens == _floor_for(_TEXT)
-        assert tokens > 247
+        assert tokens > 375
 
     def test_the_length_never_falls_below_what_the_text_needs(self):
         """A starved target does not come out fast — it comes out as a tone
@@ -115,6 +115,13 @@ class TestReferencePace:
         normal = _tokens(_TEXT, _FULL_TRANSCRIPT, ref_seconds=_REF_SECONDS * 2)
         slower = _tokens(_TEXT, _FULL_TRANSCRIPT, ref_seconds=_REF_SECONDS * 4)
         assert slower > normal
+
+    def test_the_floor_sits_clear_of_the_measured_cliff(self):
+        """Below 375 frames for this text the render is a tone, not speech
+        (#3934), so the floor must not land on the edge itself."""
+        floor = _floor_for(_TEXT)
+        assert floor > 375
+        assert floor / _FRAME_RATE > 5.0
 
     def test_longer_target_text_asks_for_more_frames(self):
         short = _tokens("hello", _FULL_TRANSCRIPT)

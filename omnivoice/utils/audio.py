@@ -70,12 +70,21 @@ MAX_REFERENCE_PACE = 24.0
 
 # Fewest audio frames the decoder can render one character-weight unit of text in
 # (#3934). A starved target does not render fast — it fails outright, coming out
-# as a near-pure tone around 620 Hz with no energy below 300 Hz. Measured on a
-# 42-character target (weight 36.4): 225 frames -> artifact, 300 -> artifact,
-# 375 -> normal speech. That puts the boundary near 8-10 frames per weight unit,
-# so the floor is set just above it. This is a floor only; a reference that
-# genuinely reads slowly may still ask for far more (MAX_REFERENCE_PACE caps it).
-MIN_FRAMES_PER_WEIGHT = 10.0
+# as a near-pure tone. Measured on a 42-character target (weight 36.4) with the
+# reference's own transcript, forcing specific frame counts:
+#
+#     225 frames -> 648.6 Hz  (+21.8 semitones, pure tone)
+#     300 frames -> 358.2 Hz  (+11.5, still an artifact)
+#     375 frames -> 196.7 Hz  (+1.1, normal speech)
+#     450 frames -> 240.0 Hz  (+4.5)
+#     600 frames -> 163.8 Hz  (-2.1)
+#
+# Below 375 the pitch flies off; above it, pitch no longer tracks frame count at
+# all (the remaining +-4 semitone scatter is a separate, unsolved variation).
+# So this floor is a cliff guard, not a pitch control: 11 frames per weight unit
+# puts a 42-character script at 400 frames, clear of the 375 edge, and leaves
+# every larger request alone.
+MIN_FRAMES_PER_WEIGHT = 11.0
 
 
 def trim_passage_to_pauses(
