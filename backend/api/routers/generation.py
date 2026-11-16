@@ -714,16 +714,20 @@ def _apply_effect_chain(audio_out, sample_rate, effect_preset, *, skip_mastering
     for VoiceStudio's 24 kHz clone output. Loudness normalization still runs —
     it's a benign peak scale. Mirrors ``_run_tts`` in openai_compat.py.
 
-    ``reference_path`` enables reference matching: the take is tilted toward the
-    reference clip's measured band balance (#3930) and brought to its loudness
+    ``reference_path`` enables reference matching: the take's register is pulled
+    back to the reference's (#3935), its bands are tilted toward the reference's
+    measured balance (#3930) and it is brought to the reference's loudness
     (#3932), so a compressed reference's muted top end is not replaced by the
-    model's full-band brightness, and a dynamic reference is not replaced by a
-    take that is 10 dB louder and compressed against the limiter.
+    model's full-band brightness, a dynamic reference is not replaced by a take
+    that is 10 dB louder and compressed against the limiter, and the scattered
+    register that made the clone "sometimes right, sometimes too high" is pulled
+    back onto the voice the user picked.
     """
     from services.audio_dsp import (
         EFFECT_PRESETS, apply_mastering, normalize_audio,
         apply_effects_chain, get_effect_chain, match_reference_tone,
         tone_match_enabled, match_reference_level, level_match_enabled,
+        match_reference_pitch, pitch_match_enabled,
     )
 
     # #629: a numerical glitch in the model (observed on MPS) can leave NaN/±inf
@@ -744,6 +748,12 @@ def _apply_effect_chain(audio_out, sample_rate, effect_preset, *, skip_mastering
     if preset == "raw":
         # Raw: skip all DSP — return raw model output
         return audio_out
+
+    # Register first: the pitch tracker wants the model's own dynamics, and the
+    # correction is a phase vocoder, so running it on the un-compressed take
+    # avoids both a smeared measurement and smeared compression (#3935).
+    if reference_path and pitch_match_enabled():
+        audio_out = match_reference_pitch(audio_out, sample_rate, reference_path)
 
     if trim_edges:
         audio_out = _trim_output_edges(audio_out, sample_rate)

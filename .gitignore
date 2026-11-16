@@ -100,6 +100,18 @@ omnivoice_data/
 !tests/fixtures/omnivoice_data/voices/test-voice/sample.wav
 
 # ─────────────────────────────────────────────────────────────────────────
+#  Register-tracking fixtures (#3935) — real takes, kept as-is.
+#  *.wav above would hide these. They are the only yardstick that works for
+#  the pitch tracker: a synthetic harmonic series is more periodic at a
+#  multiple of its period than at the period itself, so a correct detector
+#  answers an octave below what it was built for. Small (200-450 kB each).
+# ─────────────────────────────────────────────────────────────────────────
+!tests/fixtures/take_low.wav
+!tests/fixtures/take_mid.wav
+!tests/fixtures/take_high.wav
+!tests/fixtures/take_ref.wav
+
+# ─────────────────────────────────────────────────────────────────────────
 #  Bundled demo assets (synthetic, rendered by scripts/build_demos.sh).
 #  Ship with the installer so first-run users have working demos before any
 #  model weights download. *.wav above would hide these.

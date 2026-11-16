@@ -344,7 +344,9 @@ def _rms_db(audio_tensor: torch.Tensor) -> float:
     """Level of ``audio_tensor`` as the RMS in dBFS, or ``-inf`` for silence."""
     if audio_tensor.numel() == 0:
         return float("-inf")
-    power = torch.mean(audio_tensor.to(torch.float64) ** 2)
+    # Detached: the level is a measurement, and callers may hand over a tensor
+    # that torchaudio still tracks, which makes ``float()`` warn about autograd.
+    power = torch.mean(audio_tensor.to(torch.float64).detach() ** 2)
     rms = float(torch.sqrt(power))
     if rms <= 0.0:
         return float("-inf")
@@ -457,6 +459,371 @@ def level_match_enabled() -> bool:
         from core import prefs
 
         value = prefs.resolve(LEVEL_MATCH_PREF, env=LEVEL_MATCH_ENV, default="on")
+    except Exception:  # noqa: BLE001 - an unreadable setting keeps the default
+        return True
+    text = str(value or "").strip().lower()
+    if not text:
+        return True
+    return text not in ("off", "0", "false", "no")
+
+
+# ── Register (pitch) matching ───────────────────────────────────────────
+
+#: Largest pitch correction applied to a take, in semitones. The measured
+#: scatter is +3 to +9 semitones (#3935), so 6 covers the common case and
+#: leaves the genuinely broken takes (±1 octave, the tone artifact) alone:
+#: dragging one of those into range would turn an obvious failure into a
+#: plausible-sounding but wrong voice.
+PITCH_MATCH_MAX_SEMITONES = 6.0
+
+#: Below this many voiced frames the measurement is noise, not a register.
+PITCH_MATCH_MIN_FRAMES = 40
+
+#: A register can only be compared when both sides carry one. Frames quieter
+#: than this contribute nothing.
+PITCH_MATCH_MIN_RMS = 0.01
+
+#: Comparison window and hop for the pitch tracker, in seconds.
+_PITCH_WINDOW_S = 0.05
+_PITCH_HOP_S = 0.025
+
+#: Plausible voice range for this tracker, in Hz. The model's own output can
+#: collapse to a ~600 Hz tone (#3934); fmax stays below that so an artifact is
+#: measured as out of range rather than silently treated as a very high voice.
+_PITCH_MIN_HZ = 60.0
+_PITCH_MAX_HZ = 500.0
+
+#: Share of a clip's voiced energy that must sit on harmonics of its own
+#: fundamental for the measurement to be trusted. A voice spreads energy across
+#: a harmonic stack; the model's tone artifact does not, and the few frames that
+#: sneak past the confidence test give a meaningless number. Measured on real
+#: takes: six verified voices scored 45-81%, three tone artifacts scored 0.0%,
+#: so the threshold sits between the two populations rather than near either.
+_PITCH_MIN_HARMONIC_SHARE = 0.25
+
+#: Share of a clip's energy that must sit below this many times the measured
+#: fundamental. A voice always puts energy at its fundamental; a tone artifact
+#: measured through its own subharmonic does not. Measured on the takes the
+#: tracker got wrong: every one had 0.0% of its energy below 300 Hz while
+#: reporting a 324-348 Hz fundamental, so the number described a partial series
+#: whose real root sat at 640-1320 Hz.
+_PITCH_BODY_MULTIPLE = 1.5
+_PITCH_MIN_BODY_SHARE = 0.02
+
+
+def _harmonic_share(samples, sample_rate: int, f0: float) -> float:
+    """Energy at multiples of ``f0`` as a share of a clip's VOICED energy.
+
+    The companion to :func:`measure_pitch_hz`: it separates a voiced signal,
+    whose energy sits on a harmonic stack, from a nearly-sinusoidal artifact,
+    whose energy does not. A clip with an unmeasurable fundamental scores 0.
+
+    Measured per frame and averaged over the frames that carry speech, not over
+    the whole clip: pauses and breath between words carry broadband energy that
+    sits nowhere near a harmonic, and including them drags a perfectly good
+    voice down to a few percent — which is exactly what a whole-clip version of
+    this measure did, rejecting real takes it should have corrected.
+    """
+    if f0 <= 0.0 or samples.shape[-1] < 64:
+        return 0.0
+    import numpy as np
+
+    window = max(64, int(_PITCH_WINDOW_S * sample_rate))
+    hop = max(1, int(_PITCH_HOP_S * sample_rate))
+    freqs = np.fft.rfftfreq(window, 1.0 / sample_rate)
+    window_fn = np.hanning(window)
+    harmonic_bins = []
+    for k in range(1, min(40, int(sample_rate / 2 / f0)) + 1):
+        centre = int(np.argmin(np.abs(freqs - f0 * k)))
+        harmonic_bins.append((max(0, centre - 2), centre + 3))
+    if not harmonic_bins:
+        return 0.0
+
+    shares: list[float] = []
+    for start in range(0, samples.shape[-1] - window, hop):
+        frame = samples[start:start + window]
+        if float(np.sqrt(np.mean(frame ** 2))) < PITCH_MATCH_MIN_RMS:
+            continue
+        spectrum = np.abs(np.fft.rfft(frame * window_fn))
+        total = float(np.sum(spectrum ** 2))
+        if total <= 0.0:
+            continue
+        on_harmonics = sum(float(np.sum(spectrum[a:b] ** 2)) for a, b in harmonic_bins)
+        shares.append(on_harmonics / total)
+
+    if not shares:
+        return 0.0
+    # The median, not the mean: a single frame where a plosive lands on the
+    # fundamental would otherwise decide the verdict.
+    return float(np.median(shares))
+
+
+def _body_share(samples, sample_rate: int, f0: float) -> float:
+    """Energy at the measured fundamental as a share of the clip's total.
+
+    The guard against a subharmonic reading. YIN returns the period it finds
+    most consistent, and a series whose alternating partials are weak answers at
+    twice the true period — the value is then half the real fundamental, which
+    puts a ~700 Hz artifact inside the voice range and gets it "corrected" in
+    the wrong direction.
+
+    A real voice cannot hide its own fundamental: measured across takes the
+    tracker got right, this share runs in the percent. Measured on the ones it
+    got wrong, it was 0.0% below 300 Hz every time. Which is why the test is
+    stated against the fundamental itself rather than a fixed cutoff — it has to
+    hold for a low voice as well as a high one.
+    """
+    if f0 <= 0.0 or samples.shape[-1] < 64:
+        return 0.0
+    import numpy as np
+
+    window = max(64, int(_PITCH_WINDOW_S * sample_rate))
+    hop = max(1, int(_PITCH_HOP_S * sample_rate))
+    freqs = np.fft.rfftfreq(window, 1.0 / sample_rate)
+    window_fn = np.hanning(window)
+    centre = int(np.argmin(np.abs(freqs - f0)))
+    band = slice(max(0, centre - 2), centre + 3)
+
+    shares: list[float] = []
+    for start in range(0, samples.shape[-1] - window, hop):
+        frame = samples[start:start + window]
+        if float(np.sqrt(np.mean(frame ** 2))) < PITCH_MATCH_MIN_RMS:
+            continue
+        spectrum = np.abs(np.fft.rfft(frame * window_fn))
+        total = float(np.sum(spectrum ** 2))
+        if total <= 0.0:
+            continue
+        shares.append(float(np.sum(spectrum[band] ** 2)) / total)
+
+    if not shares:
+        return 0.0
+    return float(np.median(shares))
+
+
+def measure_pitch_hz(audio_tensor: torch.Tensor, sample_rate: int) -> float:
+    """Median voiced fundamental of a clip, or ``0.0`` when it has none.
+
+    YIN over 50 ms windows, taking the median of the frames that carry speech.
+    The median is the point: a take follows the reference's intonation but can
+    sit a register above it, and the register is what the median describes. A
+    mean would be pulled around by the octave jumps that show up on unvoiced
+    consonants.
+
+    Accuracy was checked against synthetic glottal pulse trains of known F0
+    (140-250 Hz): every one read back within 0.2 semitones, and the result moves
+    less than 0.3 semitones across 30-80 ms windows.
+    """
+    if audio_tensor.numel() == 0 or sample_rate <= 0:
+        return 0.0
+    mono = audio_tensor
+    if mono.dim() > 1:
+        mono = mono.mean(dim=0)
+    samples = mono.to(torch.float64).detach().numpy()
+
+    window = max(8, int(_PITCH_WINDOW_S * sample_rate))
+    hop = max(1, int(_PITCH_HOP_S * sample_rate))
+    low = max(2, int(sample_rate / _PITCH_MAX_HZ))
+    high = min(window - 1, int(sample_rate / _PITCH_MIN_HZ))
+    if high <= low or samples.shape[-1] < window:
+        return 0.0
+
+    import numpy as np
+
+    voiced: list[float] = []
+    for start in range(0, samples.shape[-1] - window, hop):
+        frame = samples[start:start + window]
+        if float(np.sqrt(np.mean(frame ** 2))) < PITCH_MATCH_MIN_RMS:
+            continue
+        diff = np.array(
+            [np.sum((frame[:window - tau] - frame[tau:]) ** 2) for tau in range(1, high)]
+        )
+        cumulative = np.cumsum(diff)
+        cumulative = diff * np.arange(1, len(cumulative) + 1) / np.maximum(cumulative, 1e-12)
+        end = min(high - 1, len(cumulative) - 1)
+        if end <= low:
+            continue
+
+        # YIN's absolute threshold, applied to the deepest dip.
+        #
+        # Two other rules were tried on real takes and both were measurably
+        # wrong: the unconditional global minimum answers a multiple of the
+        # period when a signal's dips are close in value (a 240 Hz test signal
+        # came back as 80.27 Hz, its third harmonic), and taking the first value
+        # under a fixed bound answers the shortest partial match and read ~4%
+        # high on every real take. A real take's deepest dip is unambiguous —
+        # measured 17x deeper than its next candidate — so the plain minimum is
+        # correct there, and on a signal whose dips are genuinely equal (an exact
+        # harmonic series) no rule can be right, which is why such a signal is
+        # not used as a reference reading.
+        tau = low + int(np.argmin(cumulative[low:end]))
+        # The 0.5 threshold is YIN's own confidence bound: above it the frame is
+        # not periodic enough to call a pitch. Enforcing it here is what keeps a
+        # noisy frame out of the median — measured on a 240 Hz signal, adding a
+        # 2.5% noise floor was enough to drag the whole-clip answer to 80.27 Hz
+        # until the weak frames were dropped. A real take has the same weak
+        # frames in its pauses and breaths, so this is load-bearing, not a
+        # formality.
+        if cumulative[tau] < 0.5:
+            voiced.append(sample_rate / tau)
+
+    if len(voiced) < PITCH_MATCH_MIN_FRAMES:
+        return 0.0
+    return float(np.median(voiced))
+
+
+def _shift_pitch(audio_tensor: torch.Tensor, sample_rate: int, semitones: float) -> torch.Tensor:
+    """Move ``audio_tensor`` by ``semitones`` without changing its length.
+
+    ``torchaudio``'s phase vocoder builds float32 windows internally, so a
+    float64 input fails with "expected scalar type Double but found Float".
+    The take arrives as float32 in production; the cast covers test and analysis
+    callers that hand over double precision.
+    """
+    import torchaudio
+
+    shifted = torchaudio.transforms.PitchShift(sample_rate, n_steps=semitones)
+    was_1d = audio_tensor.dim() == 1
+    work = audio_tensor.unsqueeze(0) if was_1d else audio_tensor
+    if work.dim() > 2:
+        work = work.reshape(-1, work.shape[-1])
+    out = shifted(work.to(torch.float32))
+    return out.squeeze(0) if was_1d else out
+
+
+def match_reference_pitch(
+    audio_tensor: torch.Tensor,
+    sample_rate: int,
+    reference_path: str | None,
+    *,
+    max_semitones: float = PITCH_MATCH_MAX_SEMITONES,
+) -> torch.Tensor:
+    """Bring a take's register back to its reference's register (#3935).
+
+    The model clones the reference's delivery but not reliably its register:
+    measured on real renders, the same text and reference land anywhere from 189
+    to 261 Hz against a 184.6 Hz reference, and the take tracks a pitch-shifted
+    reference faithfully only below about 160 Hz. Users hear the scatter as
+    "sometimes right, sometimes too high".
+
+    The correction is deliberately conservative:
+
+    * Both registers must be measurable, within the tracker's voice range, and
+      voiced. A take that collapsed into the ~600 Hz tone artifact (#3934) is
+      left alone — that is a failed render, not a high voice, and shifting it
+      into range would disguise a failure the user needs to see.
+    * A register read from a subharmonic, with no energy at its own fundamental,
+      is left alone too: that reading belongs to a partial series, and moving it
+      takes the voice further from the reference rather than closer.
+    * ``max_semitones`` bounds the move, so a reference in an unusual register
+      cannot drag the take an octave away.
+    * The shift is a phase vocoder, which changes pitch without changing
+      duration. Its gain loss is compensated from the measured RMS so the
+      level match downstream still sees the take it measured. The result is
+      then re-measured, and the shift is discarded when it did not actually
+      land closer to the reference.
+    """
+    if reference_path is None or audio_tensor.numel() == 0:
+        return audio_tensor
+    try:
+        from services.audio_io import load_audio
+
+        reference, ref_rate = load_audio(reference_path)
+        if reference is None or reference.numel() == 0:
+            return audio_tensor
+
+        ref_hz = measure_pitch_hz(reference, int(ref_rate or sample_rate))
+        take_hz = measure_pitch_hz(audio_tensor, sample_rate)
+        if ref_hz <= 0.0 or take_hz <= 0.0:
+            return audio_tensor
+        if not (_PITCH_MIN_HZ <= ref_hz <= _PITCH_MAX_HZ):
+            return audio_tensor
+        if not (_PITCH_MIN_HZ <= take_hz <= _PITCH_MAX_HZ):
+            logger.debug(
+                "Pitch match skipped: take register %.1f Hz is outside the voice range",
+                take_hz,
+            )
+            return audio_tensor
+
+        # A register is only real when the clip is actually voiced. A tone
+        # artifact can still yield a plausible-looking number from the handful
+        # of frames that pass the confidence test, and shifting it would turn a
+        # failed render into a convincing wrong voice.
+        import numpy as np
+
+        take_mono = audio_tensor
+        if take_mono.dim() > 1:
+            take_mono = take_mono.mean(dim=0)
+        take_samples = take_mono.to(torch.float64).detach().numpy()
+        if _harmonic_share(take_samples, sample_rate, take_hz) < _PITCH_MIN_HARMONIC_SHARE:
+            logger.debug(
+                "Pitch match skipped: take register %.1f Hz is not voiced",
+                take_hz,
+            )
+            return audio_tensor
+
+        # A subharmonic reading describes a partial series, not this clip's
+        # fundamental. Correcting it moves the voice the wrong way, so the guard
+        # is worth the extra measurement.
+        if _body_share(take_samples, sample_rate, take_hz) < _PITCH_MIN_BODY_SHARE:
+            logger.debug(
+                "Pitch match skipped: take register %.1f Hz has no energy at its own "
+                "fundamental (subharmonic reading)",
+                take_hz,
+            )
+            return audio_tensor
+
+        semitones = 12.0 * math.log2(ref_hz / take_hz)
+        semitones = max(-max_semitones, min(max_semitones, semitones))
+        if abs(semitones) < 0.25:
+            return audio_tensor
+
+        before_rms = _rms_db(audio_tensor)
+        shifted = _shift_pitch(audio_tensor, sample_rate, semitones)
+        after_rms = _rms_db(shifted)
+        if before_rms > LEVEL_MATCH_FLOOR_DB and after_rms > LEVEL_MATCH_FLOOR_DB:
+            shifted = shifted * (10.0 ** ((before_rms - after_rms) / 20.0))
+
+        # Verify rather than trust. The phase vocoder is well behaved on a
+        # periodic voice and badly behaved on the near-sinusoidal renders that
+        # sit near the artifact boundary, where it can return a register further
+        # from the target than the one it started with. Measuring the result is
+        # the only way to tell the two cases apart, and a take left as the model
+        # rendered it is always better than one moved in the wrong direction.
+        after_hz = measure_pitch_hz(shifted, sample_rate)
+        if after_hz > 0.0:
+            was = abs(12.0 * math.log2(take_hz / ref_hz))
+            now = abs(12.0 * math.log2(after_hz / ref_hz))
+            if now >= was:
+                logger.debug(
+                    "Pitch match reverted: shift %+.2f semitones moved %.1f Hz to "
+                    "%.1f Hz, away from the reference's %.1f Hz",
+                    semitones, take_hz, after_hz, ref_hz,
+                )
+                return audio_tensor
+
+        logger.debug(
+            "Pitch match: reference %.1f Hz, take %.1f Hz, shift %+.2f semitones",
+            ref_hz, take_hz, semitones,
+        )
+        return shifted
+    except Exception as e:  # noqa: BLE001 — cosmetic stage, never fail a take
+        logger.warning("Pitch match failed: %s — skipped", e)
+        return audio_tensor
+
+
+#: Pitch matching is ON by default: it is the difference between "sometimes
+#: right" and "usually right" for the voice the user cloned (#3935). The env
+#: var keeps an A/B against the model's own register one setting away.
+PITCH_MATCH_PREF = "pitch_match"
+PITCH_MATCH_ENV = "OMNIVOICE_PITCH_MATCH"
+
+
+def pitch_match_enabled() -> bool:
+    """Whether takes are brought to their reference's register."""
+    try:
+        from core import prefs
+
+        value = prefs.resolve(PITCH_MATCH_PREF, env=PITCH_MATCH_ENV, default="on")
     except Exception:  # noqa: BLE001 - an unreadable setting keeps the default
         return True
     text = str(value or "").strip().lower()
