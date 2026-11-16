@@ -74,6 +74,13 @@ LOG_TAIL_LINES = 40
 #: hot job-start paths; the throttle keeps them at one tiny JSON write per
 #: burst instead of one per request.
 ACTIVITY_THROTTLE_S = 2.0
+#: How long a recorded activity still counts as "work may have been lost when
+#: this run died". The kernel kills an idle process without losing anything, so
+#: an activity older than this only becomes a user-facing notice when the log
+#: tail also carries a fatal marker. Sits well above the longest legitimate
+#: job (a long render can run for many minutes) and well below the hours an
+#: idle app sits open before a forced stop.
+ACTIVITY_STALE_S = 900.0
 
 # An idle desktop process can disappear with its owning shell during an OS
 # shutdown, package replacement, or a forced development relaunch. Keep that
@@ -401,15 +408,52 @@ def warrants_user_notice(record: dict) -> bool:
     activity marker means a generation/transcription/task may have been lost;
     a strict fatal-log marker catches startup/native crashes that happened
     before an activity could be recorded. Idle shell-owned exits stay quiet.
+
+    ``last_activity`` alone is not enough to interrupt anyone: it records the
+    last thing this process *did*, not the last thing it was *doing*. A run
+    that finished a generate and then sat idle for two hours before being
+    killed lost no work, and telling the user it did is a false alarm they
+    cannot dismiss (error-level notices have no dismiss control). So an
+    activity marker only counts while it is recent enough that work could
+    still have been in flight — see :data:`ACTIVITY_STALE_S`. The log tail
+    stays authoritative either way: a fatal marker re-arms the notice no
+    matter how old the activity is (#1164).
     """
     activity = record.get("last_activity")
     if isinstance(activity, dict) and str(activity.get("kind") or "").strip():
-        return True
+        if not _activity_is_stale(record, activity):
+            return True
     tail = record.get("log_tail")
     if not isinstance(tail, list):
         return False
     joined = "\n".join(str(line).lower() for line in tail[-LOG_TAIL_LINES:])
     return any(marker in joined for marker in _ACTIONABLE_LOG_MARKERS)
+
+
+def _activity_is_stale(record: dict, activity: dict) -> bool:
+    """Whether the recorded activity ended long before the process did.
+
+    The death is only bounded by ``ended_between`` = [activity, detection],
+    so the honest question is how far the *start* of that window sits from its
+    end. A window wider than the bound cannot be attributed to the activity:
+    the run demonstrably went quiet afterwards, and an idle kill loses no
+    work. Unknown or unparseable timestamps stay "not stale", keeping the
+    previous behaviour (interrupt) for records that cannot be judged.
+    """
+    try:
+        ts = float(activity.get("ts"))
+    except (TypeError, ValueError):
+        return False
+    window = record.get("ended_between")
+    if not isinstance(window, (list, tuple)) or len(window) != 2:
+        return False
+    try:
+        detected = float(window[1])
+    except (TypeError, ValueError):
+        return False
+    if detected <= 0.0:
+        return False
+    return (detected - ts) > ACTIVITY_STALE_S
 
 
 def _load_store() -> dict:

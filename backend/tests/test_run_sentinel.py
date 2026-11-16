@@ -268,6 +268,52 @@ def test_interrupted_work_or_fatal_startup_still_warrants_a_warning(sentinel_env
     ) is True
 
 
+def test_an_activity_that_finished_long_before_the_death_stays_quiet(sentinel_env):
+    """A generate that completed, then hours of idling, then a forced stop.
+
+    Nothing was lost, so the notice would be a false alarm — and error-level
+    notices have no dismiss control, so the user could not clear it (#1164).
+    """
+    died_at = time.time()
+    record = {
+        "last_activity": {"ts": died_at - 13_000, "kind": "generate"},
+        "ended_between": [died_at - 13_000, died_at],
+        "log_tail": ["INFO render trace {'outcome': 'complete'}", "INFO model ready"],
+    }
+    assert run_sentinel.warrants_user_notice(record) is False
+
+
+def test_an_activity_still_in_flight_at_the_death_warns(sentinel_env):
+    died_at = time.time()
+    record = {
+        "last_activity": {"ts": died_at - 12.0, "kind": "generate"},
+        "ended_between": [died_at - 12.0, died_at],
+        "log_tail": ["INFO model ready"],
+    }
+    assert run_sentinel.warrants_user_notice(record) is True
+
+
+def test_a_fatal_marker_outranks_a_stale_activity(sentinel_env):
+    """The tail is authoritative: a crash hours into idle is still a crash."""
+    died_at = time.time()
+    record = {
+        "last_activity": {"ts": died_at - 13_000, "kind": "generate"},
+        "ended_between": [died_at - 13_000, died_at],
+        "log_tail": ["INFO idle", "CRITICAL: native runtime failed"],
+    }
+    assert run_sentinel.warrants_user_notice(record) is True
+
+
+def test_an_unjudgeable_window_keeps_the_warning(sentinel_env):
+    """No timestamps to compare means we cannot rule work out — stay loud."""
+    assert run_sentinel.warrants_user_notice(
+        {"last_activity": {"kind": "generate"}, "log_tail": []}
+    ) is True
+    assert run_sentinel.warrants_user_notice(
+        {"last_activity": {"ts": "not-a-number", "kind": "generate"}, "ended_between": []}
+    ) is True
+
+
 # ── Record store semantics (mirrors crash.rs) ──────────────────────────────
 
 
