@@ -299,3 +299,44 @@ class TestPitchMatchEnabled:
 
         monkeypatch.setattr("core.prefs.resolve", boom)
         assert dsp.pitch_match_enabled() is True
+
+
+class TestGradCarryingTensors:
+    """A take straight from the model still carries its autograd graph.
+
+    Every fixture in this file is read from disk, so it arrives detached and
+    the whole suite passed while ``apply_effects_chain`` raised
+    ``RuntimeError: Can't call numpy() on Tensor that requires grad`` on the
+    real path. These tests hand the stages a tensor that still requires grad,
+    which is what a live render does (#3935).
+    """
+
+    def _take(self, name):
+        return _load(name).requires_grad_(True)
+
+    def test_the_requirement_is_real(self):
+        """Guard the guard: a detached fixture would not exercise anything."""
+        assert self._take(MID).requires_grad is True
+
+    @pytest.mark.parametrize("preset", ["broadcast", "podcast", "cinematic"])
+    def test_the_effect_chain_accepts_a_grad_carrying_take(self, preset):
+        take = self._take(MID)
+        out = dsp.apply_effects_chain(
+            take, sample_rate=SR, chain=dsp.get_effect_chain(preset),
+        )
+        assert out.shape == take.shape
+
+    def test_the_pitch_stage_accepts_a_grad_carrying_take(self):
+        take = self._take(HIGH)
+        out = dsp.match_reference_pitch(take, SR, path(MID))
+        assert out.shape == take.shape
+
+    def test_the_other_stages_accept_a_grad_carrying_take(self):
+        take = self._take(MID)
+        reference = path(HIGH)
+        assert dsp.match_reference_level(take, SR, reference).shape == take.shape
+        assert dsp.match_reference_tone(take, SR, reference).shape == take.shape
+        assert dsp.normalize_audio(take).shape == take.shape
+        assert dsp.trim_speech_padding(take, SR).shape[-1] <= take.shape[-1]
+        assert dsp.apply_mastering(take, sample_rate=SR).shape == take.shape
+

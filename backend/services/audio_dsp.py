@@ -404,7 +404,7 @@ def match_reference_level(
         # Only the upward direction can clip: a positive gain that lands the
         # peak above the ceiling is pulled back to fit, trading a little of the
         # loudness match for headroom.
-        peak = float(torch.abs(scaled).max())
+        peak = float(torch.abs(scaled).detach().max())
         if peak > 0.0:
             peak_db = 20.0 * math.log10(peak)
             if peak_db > peak_ceiling_dbfs:
@@ -997,7 +997,7 @@ def level_speech(
     frames = -(-n // hop)
     frame_power = np.empty(frames)
     for start in range(0, n, step):
-        power = (flat[:, start:start + step].double().numpy() ** 2).mean(axis=0)
+        power = (flat[:, start:start + step].double().detach().numpy() ** 2).mean(axis=0)
         count = -(-power.shape[0] // hop)
         padded = np.zeros(count * hop)
         padded[:power.shape[0]] = power
@@ -1045,7 +1045,9 @@ def level_speech(
     for start in range(0, n, step):
         stop = min(n, start + step)
         gain = 10.0 ** (np.interp(np.arange(start, stop), centers, gain_db) / 20.0)
-        out[:, start:stop] = torch.from_numpy(flat[:, start:stop].double().numpy() * gain)
+        out[:, start:stop] = torch.from_numpy(
+            flat[:, start:stop].double().detach().numpy() * gain
+        )
     return out.reshape(source.shape).to(audio_tensor.device)
 
 
@@ -1109,7 +1111,7 @@ def peak_limit(
     for start in range(0, n, step):
         stop = min(n, start + step)
         lo, hi = max(0, start - before), min(n, stop + after)
-        block = flat[:, lo:hi].double().numpy()
+        block = flat[:, lo:hi].double().detach().numpy()
         gain = np.minimum(1.0, ceiling / np.maximum(np.abs(block).max(axis=0), 1e-12))
         if gain.min() >= 1.0:
             continue
@@ -1249,7 +1251,11 @@ def apply_effects_chain(audio_tensor, sample_rate: int, chain: list[dict]) -> to
         return audio_tensor
 
     board = Pedalboard(plugins)
-    audio_np = audio_tensor.cpu().numpy()
+    # ``detach`` because a take arriving straight from the model carries
+    # requires_grad=True, and numpy() refuses such a tensor. This is the path
+    # every non-raw preset takes, so without it the whole effect chain raises
+    # "Can't call numpy() on Tensor that requires grad" (#3935).
+    audio_np = audio_tensor.detach().cpu().numpy()
     if audio_np.ndim == 1:
         audio_np = audio_np[None, :]
     try:
